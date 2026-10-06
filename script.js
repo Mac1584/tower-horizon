@@ -1,79 +1,169 @@
 "use strict";
 
-// No network calls: this prototype intentionally keeps all calculations local.
-const SAMPLE = Object.freeze({ asrn: "1004233", tower: 366, base: 46, offset: 8 });
-const $ = (id) => document.getElementById(id);
-const form = $("calculator");
-const number = (value, digits = 1) => value.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: digits });
+// BEGINNER GUIDE: IDs below match the id="..." attributes in index.html.
+// Keep this file beside index.html and style.css. It runs after the HTML loads.
+const WORKER_URL = "https://tower-data-api.mac1584.workers.dev";
+const FEET_TO_METERS = 0.3048;
+const METERS_PER_MILE = 1609.344;
+const EARTH_RADIUS_METERS = 6371000;
+const ANTENNA_SETBACK_FEET = 26.2467; // 8 meters below the tower top.
+const byId = (id) => document.getElementById(id);
+const towerHeight = byId("towerHeight");
+const radCenter = byId("radCenter");
+const receiverHeight = byId("receiverHeight");
+const baseElevation = byId("baseElevation");
+const lookupButton = byId("asrnLookup");
+const numberFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 
-function calculateHorizon(towerM, offsetM, baseM, receiverFt) {
-  if (![towerM, offsetM, baseM, receiverFt].every(Number.isFinite) || towerM < 0 || offsetM < 0 || offsetM > towerM || receiverFt < 0) {
-    throw new RangeError("Enter finite heights; the top offset must not exceed the tower height.");
+// Once you type your own radiation center, changing tower height preserves it.
+// An explicit new lookup replaces the tower inputs and returns to automatic mode.
+let radiationCenterEdited = false;
+
+function readNumber(input) {
+  // Number("") is zero, so handle blank inputs explicitly instead.
+  if (input.value.trim() === "") return null;
+  const value = Number(input.value);
+  return Number.isFinite(value) ? value : null;
+}
+
+function estimateRadiationCenter() {
+  const height = readNumber(towerHeight);
+  radCenter.value = height !== null && height >= 0
+    ? String(Math.round(Math.max(0, height - ANTENNA_SETBACK_FEET) * 10000) / 10000)
+    : "";
+}
+
+function setText(id, text) { byId(id).textContent = text; }
+function format(value) { return numberFormat.format(value); }
+
+function horizonMiles(transmitterFeet, receiverFeet, k) {
+  // Each endpoint contributes its own horizon. k=4/3 models standard refraction.
+  const endpoint = (feet) => Math.sqrt(2 * k * EARTH_RADIUS_METERS * feet * FEET_TO_METERS);
+  return (endpoint(transmitterFeet) + endpoint(receiverFeet)) / METERS_PER_MILE;
+}
+
+function update() {
+  const height = readNumber(towerHeight);
+  const transmitter = readNumber(radCenter);
+  const receiver = readNumber(receiverHeight);
+  const elevation = readNumber(baseElevation);
+  const invalidHeights = [height, transmitter, receiver].some((n) => n === null || n < 0);
+  const invalidElevation = baseElevation.value.trim() !== "" && elevation === null;
+
+  setText("radHelp", radiationCenterEdited
+    ? "Manual radiation center: your value is preserved when tower height changes."
+    : "Automatic estimate: tower top minus 8 m (26.2467 ft), with a minimum of 0 ft. A lookup may supply its own rounded estimate.");
+  setText("diagramTx", transmitter === null || transmitter < 0 ? "Radiation center: —" : `Radiation center: ${format(transmitter)} ft AGL`);
+  setText("diagramRx", receiver === null || receiver < 0 ? "Height: —" : `${format(receiver)} ft AGL`);
+
+  if (invalidHeights || invalidElevation) {
+    setText("inputStatus", "Enter nonnegative tower, radiation-center, and receiver heights. Base elevation may be blank or any finite number.");
+    byId("inputStatus").classList.add("error");
+    ["radioHorizon", "radioKm", "geometricHorizon", "geometricKm", "theoreticalArea", "radiationAMSL", "diagramDistance"].forEach((id) => setText(id, "—"));
+    setText("amslNote", "Complete the valid height inputs first");
+    return;
   }
-  const agl = towerM - offsetM;
-  const heightSum = Math.sqrt(agl) + Math.sqrt(receiverFt * 0.3048);
-  const geometricKm = Math.sqrt(2 * 6371 / 1000) * heightSum;
-  const radioKm = geometricKm * Math.sqrt(4 / 3);
-  return { agl, amsl: baseM + agl, geometricKm, radioKm, areaKm2: Math.PI * radioKm ** 2 };
-}
 
-function syncFields() {
-  const manual = $("mode").value === "manual";
-  const coords = $("location-type").value === "coords";
-  $("asrn-fields").hidden = manual;
-  $("manual-fields").hidden = !manual;
-  $("zip-fields").hidden = coords;
-  $("coords-fields").hidden = !coords;
-  $("zip").disabled = !manual || coords;
-  $("latitude").disabled = $("longitude").disabled = !manual || !coords;
-  $("asrn").disabled = manual;
-}
-
-function clearResults(message) {
-  for (const id of ["radio", "geometric", "area", "agl", "amsl"]) $(id).textContent = "—";
-  $("radio-km").textContent = "Calculate with valid inputs to see results";
-  $("context").textContent = "Results pending";
-  $("svg-tx").textContent = "Height pending";
-  $("svg-rx").textContent = "Height pending";
-  $("status").textContent = message;
-}
-
-function calculate() {
-  $("offset").setCustomValidity("");
-  const tower = $("tower").valueAsNumber;
-  const offset = $("offset").valueAsNumber;
-  if (offset > tower) $("offset").setCustomValidity("The radiation-center offset cannot exceed the tower height.");
-  if (!form.checkValidity()) { clearResults("Check the highlighted input fields."); form.reportValidity(); return; }
-  const manual = $("mode").value === "manual";
-  if (!manual && $("asrn").value.trim() !== SAMPLE.asrn) {
-    clearResults("Only ASRN 1004233 is built in. Choose Manual entry for another tower; live ASRN lookup is not connected."); return;
+  byId("inputStatus").classList.remove("error");
+  setText("inputStatus", transmitter > height
+    ? "Check your inputs: radiation center is above the registered tower top. The estimate uses your entered value."
+    : "");
+  const radio = horizonMiles(transmitter, receiver, 4 / 3);
+  const geometric = horizonMiles(transmitter, receiver, 1);
+  const area = Math.PI * radio * radio;
+  if (![radio, geometric, area, elevation === null ? 0 : elevation + transmitter].every(Number.isFinite)) {
+    setText("inputStatus", "These inputs are too large to calculate. Enter realistic heights.");
+    byId("inputStatus").classList.add("error");
+    ["radioHorizon", "radioKm", "geometricHorizon", "geometricKm", "theoreticalArea", "radiationAMSL", "diagramDistance"].forEach((id) => setText(id, "—"));
+    setText("amslNote", "Enter realistic heights");
+    return;
   }
-  const lat = $("latitude").value, lon = $("longitude").value;
-  if (manual && $("location-type").value === "coords" && Boolean(lat) !== Boolean(lon)) {
-    clearResults("Enter both latitude and longitude, or leave both blank."); return;
-  }
-  const rx = $("receiver").valueAsNumber;
-  const result = calculateHorizon(tower, offset, $("base").valueAsNumber, rx);
-  $("radio").textContent = `${number(result.radioKm / 1.609344)} miles`;
-  $("radio-km").textContent = `${number(result.radioKm)} km · transmitter + receiver horizons`;
-  $("geometric").textContent = `${number(result.geometricKm / 1.609344)} mi / ${number(result.geometricKm)} km`;
-  $("area").textContent = `${number(result.areaKm2 / 2.589988110336, 0)} mi² / ${number(result.areaKm2, 0)} km²`;
-  $("agl").textContent = `${number(result.agl)} m / ${number(result.agl / 0.3048)} ft`;
-  $("amsl").textContent = `${number(result.amsl)} m / ${number(result.amsl / 0.3048)} ft`;
-  $("svg-tx").textContent = `${number(result.agl)} m AGL`;
-  $("svg-rx").textContent = `${number(rx)} ft AGL`;
-  const location = $("location-type").value === "zip" ? $("zip").value.trim() : (lat && lon ? `${lat}, ${lon}` : "");
-  $("context").textContent = manual ? `Manual inputs${location ? " · " + location : " · no location supplied"}` : "ASRN 1004233 · editable Needham sample";
-  $("status").textContent = "Calculated from the heights shown. No external data was fetched.";
+  setText("radioHorizon", `${format(radio)} mi`);
+  setText("radioKm", `${format(radio * 1.609344)} km · k = 4/3`);
+  setText("geometricHorizon", `${format(geometric)} mi`);
+  setText("geometricKm", `${format(geometric * 1.609344)} km · k = 1`);
+  setText("theoreticalArea", `${format(area)} mi²`);
+  setText("radiationAMSL", elevation === null ? "Unknown" : `${format(elevation + transmitter)} ft`);
+  setText("amslNote", elevation === null ? "Enter base elevation to calculate" : "Base elevation + radiation center AGL");
+  setText("diagramDistance", `${format(radio)} mi`);
 }
 
-form.addEventListener("submit", (event) => { event.preventDefault(); calculate(); });
-form.addEventListener("input", () => { $("offset").setCustomValidity(""); clearResults("Inputs changed. Select Calculate horizon to update."); });
-for (const id of ["mode", "location-type"]) $(id).addEventListener("change", () => { syncFields(); clearResults("Input method changed. Review the heights and calculate."); });
-$("load").addEventListener("click", () => {
-  if ($("asrn").value.trim() !== SAMPLE.asrn) { clearResults("Only ASRN 1004233 is built in. Use Manual entry for other towers."); return; }
-  for (const id of ["tower", "base", "offset"]) $(id).value = SAMPLE[id];
-  calculate();
+function lookupStatus(message, isError = false) {
+  setText("lookupStatus", message);
+  byId("lookupStatus").classList.toggle("error", isError);
+}
+
+async function lookupTower(event) {
+  event.preventDefault(); // Do not reload the page when the form is submitted.
+  const asrn = byId("asrn").value.trim();
+  if (!/^\d{7}$/.test(asrn)) {
+    lookupStatus("Enter a seven-digit FCC ASRN, such as 1004233.", true);
+    return;
+  }
+  lookupButton.disabled = true;
+  lookupButton.textContent = "Looking up…";
+  lookupStatus("Requesting tower data…");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    // This is the only external request. No API key is required in these files.
+    const response = await fetch(`${WORKER_URL}/tower?asrn=${encodeURIComponent(asrn)}`, {
+      signal: controller.signal
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || data.error || `Lookup failed (HTTP ${response.status}).`);
+
+    // Prototype fields: location, towerHeightFeet, estimatedRadiationCenterFeet,
+    // receiverHeightFeet, siteName, warning, source, latitude and longitude.
+    // Validate before changing any inputs; an error preserves your current work.
+    const apiNumber = (value) => {
+      if (value === null || value === undefined || value === "") return null;
+      const number = Number(value);
+      return Number.isFinite(number) && number >= 0 ? number : null;
+    };
+    const height = apiNumber(data.towerHeightFeet);
+    if (height === null) throw new Error("The API did not return a valid towerHeightFeet field.");
+    const radiation = apiNumber(data.estimatedRadiationCenterFeet);
+    const receiver = apiNumber(data.receiverHeightFeet);
+    const coordinates = Number.isFinite(data.latitude) && Number.isFinite(data.longitude)
+      ? `${data.latitude}, ${data.longitude}` : "";
+
+    byId("location").value = typeof data.location === "string" ? data.location : coordinates;
+    towerHeight.value = String(height);
+    radiationCenterEdited = false;
+    radCenter.value = String(radiation ?? Math.max(0, height - ANTENNA_SETBACK_FEET));
+    receiverHeight.value = String(receiver ?? 6);
+    // The prototype does not supply ground elevation. Clear a previous site's
+    // manual elevation so it cannot silently carry over to this new tower.
+    baseElevation.value = "";
+    const notes = [data.siteName, data.source, data.warning].filter((value) => typeof value === "string" && value.trim());
+    lookupStatus(`ASRN ${asrn} loaded. ${notes.join(" ")} Base elevation is unknown; enter it manually.`);
+    update();
+  } catch (error) {
+    const message = error.name === "AbortError"
+      ? "The tower API timed out. Try again or continue with manual inputs."
+      : `Could not retrieve this tower: ${error.message} You can continue with manual inputs.`;
+    lookupStatus(message, true);
+  } finally {
+    clearTimeout(timeout);
+    lookupButton.disabled = false;
+    lookupButton.textContent = "Look Up FCC";
+  }
+}
+
+// Listen for typing so results update immediately, with no Calculate button.
+towerHeight.addEventListener("input", () => {
+  if (!radiationCenterEdited) estimateRadiationCenter();
+  update();
 });
-syncFields();
-calculate();
+radCenter.addEventListener("input", () => { radiationCenterEdited = true; update(); });
+receiverHeight.addEventListener("input", update);
+baseElevation.addEventListener("input", update);
+byId("resetRadCenter").addEventListener("click", () => {
+  radiationCenterEdited = false;
+  estimateRadiationCenter();
+  update();
+});
+byId("towerForm").addEventListener("submit", lookupTower);
+update(); // Populate results using the initial illustrative heights.

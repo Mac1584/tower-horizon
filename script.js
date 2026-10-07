@@ -114,8 +114,8 @@ async function lookupTower(event) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || data.error || `Lookup failed (HTTP ${response.status}).`);
 
-    // Prototype fields: location, towerHeightFeet, estimatedRadiationCenterFeet,
-    // receiverHeightFeet, siteName, warning, source, latitude and longitude.
+    // API fields: location, towerHeightFeet, estimatedRadiationCenterFeet,
+    // baseElevationFeet, receiverHeightFeet, siteName, warning, source, coordinates.
     // Validate before changing any inputs; an error preserves your current work.
     const apiNumber = (value) => {
       if (value === null || value === undefined || value === "") return null;
@@ -134,11 +134,13 @@ async function lookupTower(event) {
     radiationCenterEdited = false;
     radCenter.value = String(radiation ?? Math.max(0, height - ANTENNA_SETBACK_FEET));
     receiverHeight.value = String(receiver ?? 6);
-    // The prototype does not supply ground elevation. Clear a previous site's
-    // manual elevation so it cannot silently carry over to this new tower.
-    baseElevation.value = "";
+    // Elevation can be negative. Missing elevation clears the previous site's value.
+    const elevation = data.baseElevationFeet;
+    const hasElevation = elevation !== null && elevation !== undefined && elevation !== ""
+      && Number.isFinite(Number(elevation));
+    baseElevation.value = hasElevation ? String(Number(elevation)) : "";
     const notes = [data.siteName, data.source, data.warning].filter((value) => typeof value === "string" && value.trim());
-    lookupStatus(`ASRN ${asrn} loaded. ${notes.join(" ")} Base elevation is unknown; enter it manually.`);
+    lookupStatus(`ASRN ${asrn} loaded. ${notes.join(" ")} ${hasElevation ? "Base elevation loaded from the FCC record." : "Base elevation is unknown; enter it manually."}`);
     update();
   } catch (error) {
     const message = error.name === "AbortError"

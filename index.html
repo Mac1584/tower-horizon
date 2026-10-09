@@ -3,84 +3,113 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Estimate a broadcast tower's radio and geometric horizons from antenna and receiver heights.">
-  <title>How Far Can That Tower See?</title>
-  <!-- Keep all three files in the same folder. No build tools are needed. -->
+  <meta name="description" content="Estimate a broadcast tower's radio and geometric horizons from antenna and receiver heights. Tower Horizon Calculator v1.9 from Waypoint Utility Web.">
+  <title>Tower Horizon Calculator v1.9 — Waypoint Utility Web</title>
+  <link rel="stylesheet" href="waypoint.css">
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
 </head>
 <body>
-  <header class="masthead">
-    <div class="wrap"><p class="eyebrow">Broadcast engineering / field calculator</p>
-    <h1>How Far Can That Tower See?</h1>
-    <p class="intro">A quick look at antenna height, Earth's curvature, and the radio horizon.</p></div>
+  <a class="wuw-skip" href="#calculator">Skip to calculator</a>
+  <header class="wuw-header">
+    <div>
+      <p class="wuw-brand"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 20h18M7 20l5-17 5 17M9 13h6M8 17h8M6 7h3M15 7h3M4 4h4M16 4h4"/></svg>Waypoint Utility Web</p>
+      <h1 class="wuw-title">Tower Horizon Calculator</h1>
+      <p class="wuw-subtitle">How far can that tower see? Antenna height, Earth's curvature, and the radio horizon.</p>
+    </div>
+    <div class="wuw-meta"><span class="wuw-version">VERSION 1.9</span><span class="wuw-status">STATUS: STABLE</span></div>
   </header>
-  <main class="wrap">
-    <noscript><p class="notice">Please enable JavaScript to use the calculator.</p></noscript>
+  <nav class="wuw-nav" aria-label="Tool navigation">
+    <a class="active" href="#calculator"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM8 6h8M8 10h2M14 10h2M8 14h2M14 14h2M8 18h2M14 18h2"/></svg>Calculator</a>
+    <a href="#method"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18M6 16l4-8 4 5 5-9M3 4v15"/></svg>Method</a>
+    <a href="#sources"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7l1 2 1-2h7v15h-7l-1 2-1-2H4zM12 6v15M7 8h2M15 8h2M7 12h2M15 12h2"/></svg>Sources</a>
+    <span class="wuw-nav-divider" aria-hidden="true"></span>
+    <a href="https://mac1584.github.io/impact-force-calculator/" aria-label="Open Camel Collision Calculator">Camel Collision</a>
+    <a href="https://mac1584.github.io/Delay_Calc/" aria-label="Open Video Delay Calculator">Video Delay</a>
+  </nav>
+  <main class="wuw-body" id="calculator">
+    <noscript><p class="wuw-note">Please enable JavaScript to use the calculator.</p></noscript>
     <div class="workspace">
-      <section class="panel controls" aria-labelledby="inputsTitle">
-        <div class="section-heading"><span class="step">01</span><h2 id="inputsTitle">Tower &amp; receiver</h2><span class="unit-tag">feet</span></div>
-        <form id="towerForm" novalidate>
-          <label for="asrn">FCC Antenna Structure Registration Number (ASRN)</label>
-          <div class="lookup-row"><input id="asrn" name="asrn" type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" placeholder="1004233" aria-describedby="lookupHelp"><button id="asrnLookup" type="submit">Look Up FCC</button></div>
-          <p id="lookupHelp" class="hint">Try 1004233. Lookup uses an imported snapshot of FCC ASR registrations.</p>
-          <p id="lookupStatus" class="status" role="status" aria-live="polite">Enter an ASRN or use the manual inputs below.</p>
-          <div class="divider"></div>
-          <label for="location">Location <span class="optional">ZIP or latitude, longitude</span></label>
-          <input id="location" name="location" type="text" placeholder="e.g. 02494 or 42.29, -71.23" aria-describedby="locationHelp">
-          <p id="locationHelp" class="hint">A reference label only; no geocoding, terrain, or population lookup is performed.</p>
-          <div class="input-grid">
-            <div><label for="baseElevation">Base elevation <span class="optional">ft AMSL</span></label><input id="baseElevation" type="number" step="any" placeholder="Unknown" aria-describedby="baseHelp"></div>
-            <div><label for="towerHeight">Registered tower height <span class="optional">ft AGL</span></label><input id="towerHeight" type="number" min="0" step="any" value="1201"></div>
-            <div><label for="radCenter">Radiation center <span class="optional">ft AGL</span></label><input id="radCenter" type="number" min="0" step="any" value="1174.7533" aria-describedby="radHelp"></div>
-            <div><label for="receiverHeight">Receiver height <span class="optional">ft AGL</span></label><input id="receiverHeight" type="number" min="0" step="any" value="6"></div>
+      <div class="controls">
+        <section class="wuw-panel" aria-labelledby="inputsTitle">
+          <h2 class="wuw-panel-title" id="inputsTitle"><svg class="wuw-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6M16 14v6"/></svg>Inputs <span class="unit-tag">Heights in feet</span></h2>
+          <div class="wuw-panel-content">
+            <form id="towerForm" novalidate>
+              <label for="asrn">FCC Antenna Structure Registration Number (ASRN)</label>
+              <div class="lookup-row"><input id="asrn" name="asrn" type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" placeholder="1004233" aria-describedby="lookupHelp lookupStatus"><button id="asrnLookup" type="submit">Look Up FCC</button></div>
+              <p id="lookupHelp" class="hint">Try 1004233. Lookup uses an imported snapshot of FCC ASR registrations.</p>
+              <p id="lookupStatus" class="status" role="status" aria-live="polite">Enter an ASRN or use the manual inputs below.</p>
+              <div class="divider"></div>
+              <label for="location">Location <span class="optional">ZIP or latitude, longitude</span></label>
+              <input id="location" name="location" type="text" placeholder="e.g. 02494 or 42.29, -71.23" aria-describedby="locationHelp">
+              <p id="locationHelp" class="hint">A reference label only; no geocoding, terrain, or population lookup is performed.</p>
+              <div class="input-grid">
+                <div><label for="baseElevation">Base elevation <span class="optional">ft AMSL</span></label><input id="baseElevation" type="number" step="any" placeholder="Unknown" aria-describedby="baseHelp inputStatus"></div>
+                <div><label for="towerHeight">Registered tower height <span class="optional">ft AGL</span></label><input id="towerHeight" type="number" min="0" step="any" value="1201" aria-describedby="inputStatus"></div>
+                <div><label for="radCenter">Radiation center <span class="optional">ft AGL</span></label><input id="radCenter" type="number" min="0" step="any" value="1174.7533" aria-describedby="radHelp inputStatus"></div>
+                <div><label for="receiverHeight">Receiver height <span class="optional">ft AGL</span></label><input id="receiverHeight" type="number" min="0" step="any" value="6" aria-describedby="inputStatus"></div>
+              </div>
+              <p id="baseHelp" class="hint">AMSL = above mean sea level. AGL = above ground level. Base elevation affects only the AMSL result.</p>
+              <p id="radHelp" class="hint">Automatic estimate: tower top minus 8 m (26.2467 ft), with a minimum of 0 ft.</p>
+              <button id="resetRadCenter" class="secondary-button" type="button">Use automatic radiation center</button>
+              <p id="inputStatus" class="status" role="status" aria-live="polite"></p>
+            </form>
           </div>
-          <p id="baseHelp" class="hint">AMSL = above mean sea level. AGL = above ground level. Base elevation affects only the AMSL result.</p>
-          <p id="radHelp" class="hint">Automatic estimate: tower top minus 8 m (26.2467 ft), with a minimum of 0 ft.</p>
-          <button id="resetRadCenter" class="text-button" type="button">Use automatic radiation center</button>
-          <p id="inputStatus" class="status" role="status" aria-live="polite"></p>
-        </form>
-        <div class="section-heading results-heading"><span class="step">02</span><h2>Horizon estimates</h2></div>
-        <div class="results" aria-live="polite" aria-atomic="true">
-          <div class="result primary"><span>Standard radio horizon</span><strong id="radioHorizon">—</strong><small id="radioKm">k = 4/3 effective Earth</small></div>
-          <div class="result"><span>Geometric horizon</span><strong id="geometricHorizon">—</strong><small id="geometricKm">k = 1, no refraction</small></div>
-          <div class="result"><span>Theoretical area</span><strong id="theoreticalArea">—</strong><small>Circle using the radio-horizon radius</small></div>
-          <div class="result"><span>Radiation center AMSL</span><strong id="radiationAMSL">—</strong><small id="amslNote">Enter base elevation to calculate</small></div>
-          <div class="result placeholder"><span>Estimated population</span><strong>Not available</strong><small>Placeholder — Census data not connected</small></div>
-          <div class="result placeholder"><span>Population density</span><strong>Not available</strong><small>Placeholder — people per square mile</small></div>
+        </section>
+        <section class="wuw-panel results-panel" aria-labelledby="resultsTitle">
+          <h2 class="wuw-panel-title major" id="resultsTitle"><svg class="wuw-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7M2 20h20"/></svg>Results <span class="unit-tag">Updated as you type</span></h2>
+          <div class="wuw-panel-content results" aria-live="polite" aria-atomic="true">
+            <div class="result primary"><span>Standard radio horizon</span><strong id="radioHorizon">—</strong><small id="radioKm">k = 4/3 effective Earth</small></div>
+            <div class="result"><span>Geometric horizon</span><strong id="geometricHorizon">—</strong><small id="geometricKm">k = 1, no refraction</small></div>
+            <div class="result"><span>Theoretical area</span><strong id="theoreticalArea">—</strong><small>Circle using the radio-horizon radius</small></div>
+            <div class="result"><span>Radiation center AMSL</span><strong id="radiationAMSL">—</strong><small id="amslNote">Enter base elevation to calculate</small></div>
+            <div class="result placeholder"><span>Estimated population</span><strong>Not available</strong><small>Placeholder — Census data not connected</small></div>
+            <div class="result placeholder"><span>Population density</span><strong>Not available</strong><small>Placeholder — people per square mile</small></div>
+          </div>
+        </section>
+      </div>
+      <aside class="wuw-panel diagram-panel" aria-labelledby="diagramTitle">
+        <h2 class="wuw-panel-title" id="diagramTitle"><svg class="wuw-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M7 21l5-17 5 17M9 13h6M8 17h8M4 5l3 3M17 8l3-3"/></svg>Across the curve</h2>
+        <div class="wuw-panel-content">
+          <p class="diagram-intro">More antenna height extends the horizon. A raised receiver adds distance of its own.</p>
+          <figure>
+            <svg class="wuw-diagram curve-diagram" viewBox="0 0 640 430" role="img" aria-labelledby="svgTitle svgDesc">
+              <title id="svgTitle">Broadcast tower and receiver above a curved Earth</title>
+              <desc id="svgDesc">A convex upward Earth arc, broadcast tower on the left, receiver on the right, and a dashed illustrative radio path. Not to scale. Current antenna heights are listed below the diagram.</desc>
+              <path d="M20 355 Q320 165 620 355 L620 410 L20 410Z" fill="#e5e7e8"/>
+              <path d="M20 355 Q320 165 620 355" fill="none" stroke="#89949d" stroke-width="2"/>
+              <path d="M133 106 Q328 151 524 297" fill="none" stroke="#356641" stroke-width="3" stroke-dasharray="9 7"/>
+              <g stroke="#193b58" stroke-width="3" fill="none">
+                <path d="M105 297 L133 67 L161 271 M108 275 L157 249 L113 230 L153 207 L118 185 L148 165 L123 144 L143 124 L127 102 L139 84 M99 300 L166 269 M133 67V51"/>
+                <path d="M524 306V297M514 307H534M515 293L533 301M518 289L534 294"/>
+              </g>
+              <circle cx="133" cy="106" r="5" fill="#356641"/>
+              <g fill="none" stroke="#356641" stroke-width="2"><path d="M115 92Q103 106 115 120M151 92Q163 106 151 120M104 83Q84 106 104 129M162 83Q182 106 162 129"/></g>
+              <g fill="#fff" stroke="#89949d" stroke-width="1"><rect x="204" y="45" width="146" height="36"/><rect x="428" y="221" width="160" height="36"/></g>
+              <rect x="247" y="156" width="165" height="36" fill="#fff3c1" stroke="#b5a565"/>
+              <g class="diagram-label"><text x="218" y="70">TOWER</text><text x="443" y="246">RECEIVER</text><text x="260" y="182">RADIO PATH*</text><text x="255" y="362">EARTH'S SURFACE</text></g>
+              <g stroke="#89949d" stroke-width="1" fill="none"><path d="M204 70L148 106M508 257L523 291"/></g>
+            </svg>
+            <figcaption class="diagram-readout"><p><span class="readout-label">Tower antenna</span><span id="diagramTx">Radiation center: 1,174.8 ft AGL</span></p><p><span class="readout-label">Receiver antenna</span><span id="diagramRx">6 ft AGL</span></p></figcaption>
+          </figure>
+          <div class="diagram-metric"><span>Combined radio horizon</span><strong id="diagramDistance">—</strong></div>
+          <p class="hint">*Conceptual illustration, not to scale. The curve and path do not represent a terrain profile or a modeled signal ray.</p>
+          <div class="wuw-note"><strong>Radio horizon is not actual coverage.</strong><p>Terrain, buildings, trees, frequency, transmitter power, antenna pattern, receiver sensitivity, interference, and atmospheric conditions all affect reception.</p></div>
         </div>
-      </section>
-      <aside class="panel diagram-panel" aria-labelledby="diagramTitle">
-        <div class="section-heading"><span class="step">03</span><h2 id="diagramTitle">Across the curve</h2></div>
-        <p class="diagram-intro">More antenna height extends the horizon. A raised receiver adds distance of its own.</p>
-        <svg viewBox="0 0 640 450" role="img" aria-labelledby="svgTitle svgDesc">
-          <title id="svgTitle">Broadcast tower and receiver above a curved Earth</title>
-          <desc id="svgDesc">A convex upward Earth arc, tower on the left, receiver on the right, and a dashed illustrative radio path. Not to scale.</desc>
-          <defs><linearGradient id="groundFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dbe4da"/><stop offset="1" stop-color="#f2f5ec"/></linearGradient></defs>
-          <!-- The middle of this arc is HIGHER on screen than its ends: a convex upward Earth. -->
-          <path d="M 20 365 Q 320 170 620 365 L 620 445 L 20 445 Z" fill="url(#groundFill)"/>
-          <path d="M 20 365 Q 320 170 620 365" fill="none" stroke="#7a8974" stroke-width="3"/>
-          <path d="M 133 108 Q 328 151 524 301" fill="none" stroke="#b87924" stroke-width="3" stroke-dasharray="9 7"/>
-          <g stroke="#263d4d" stroke-width="3" fill="none" stroke-linejoin="round">
-            <path d="M 105 305 L 133 69 L 161 279 M 108 283 L 157 257 L 113 238 L 153 215 L 118 193 L 148 173 L 123 152 L 143 132 L 127 110 L 139 92"/>
-            <path d="M 99 308 L 166 277 M 133 70 L 133 54"/>
-          </g>
-          <circle cx="133" cy="108" r="6" fill="#b87924"/>
-          <g fill="none" stroke="#b87924" stroke-width="2"><path d="M 115 94 Q 103 108 115 122 M 151 94 Q 163 108 151 122 M 104 85 Q 84 108 104 131 M 162 85 Q 182 108 162 131"/></g>
-          <g stroke="#263d4d" stroke-width="3" fill="none"><path d="M 524 310 L 524 301 M 514 311 L 534 311 M 515 297 L 533 305 M 518 293 L 534 298"/></g>
-          <g class="svg-label"><text x="186" y="72">Broadcast antenna</text><text x="186" y="96" id="diagramTx">Radiation center: 1,174.8 ft AGL</text><text x="405" y="256">Receiver</text><text x="405" y="278" id="diagramRx">6 ft AGL</text><text x="246" y="342">Earth's surface</text><text x="263" y="204" fill="#956016">Radio path*</text></g>
-          <g stroke="#7a8974" stroke-width="1" fill="none"><path d="M 182 92 L 148 108 M 485 282 L 520 302"/></g>
-        </svg>
-        <div class="diagram-metric"><span>Combined radio horizon</span><strong id="diagramDistance">—</strong></div>
-        <p class="hint">*Conceptual illustration, not to scale. The curve and path do not represent a terrain profile or a modeled signal ray.</p>
-        <div class="notice"><strong>Radio horizon is not actual coverage.</strong><p>Terrain, buildings, trees, frequency, transmitter power, antenna pattern, receiver sensitivity, interference, and atmospheric conditions all affect reception.</p></div>
       </aside>
     </div>
-    <section class="panel assumptions" aria-labelledby="assumptionsTitle">
-      <h2 id="assumptionsTitle">Formulas &amp; assumptions</h2>
-      <div class="assumption-grid"><div><h3>Distance from both antenna heights</h3><p>Heights hₜ and hᵣ are in feet AGL; distances are in miles.</p><p class="formula">Radio: d ≈ 1.415 × (√hₜ + √hᵣ)<br>Geometric: d ≈ 1.225 × (√hₜ + √hᵣ)</p><p>The calculation uses √(2kRh) for each endpoint, R = 6,371 km, and k = 4/3 for a standard refracting atmosphere or k = 1 for geometric line of sight. Coefficients shown are rounded; calculations use the constants directly. See <a href="https://www.itu.int/dms_pub/itu-r/opb/rep/R-REP-P.2345-2015-PDF-E.pdf" target="_blank" rel="noopener noreferrer">ITU horizon geometry</a>.</p></div><div><h3>A useful first approximation</h3><p>Area = πd², a theoretical circle in square miles. Radiation center AMSL = base elevation AMSL + radiation center AGL.</p><p>Assumes a smooth Earth and similar ground elevations at both ends. These heights are not HAAT (height above average terrain). Base elevation is not added to the horizon height.</p><p>The 8 m antenna setback is a rough convenience estimate, not FCC antenna data. Enter the actual radiation center when known. ZIP or coordinates do not change the results. Population and density are reserved for a future data integration.</p></div></div>
+    <section class="wuw-panel method" id="method" aria-labelledby="methodTitle">
+      <h2 class="wuw-panel-title" id="methodTitle"><svg class="wuw-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18M6 16l4-8 4 5 5-9M3 4v15"/></svg>Method &amp; assumptions</h2>
+      <div class="wuw-panel-content assumption-grid">
+        <div><h3>Distance from both antenna heights</h3><p>Heights hₜ and hᵣ are in feet AGL; distances are in miles.</p><p class="formula">Radio: d ≈ 1.415 × (√hₜ + √hᵣ)<br>Geometric: d ≈ 1.225 × (√hₜ + √hᵣ)</p><p>The calculation uses √(2kRh) for each endpoint, R = 6,371 km, and k = 4/3 for a standard refracting atmosphere or k = 1 for geometric line of sight. Coefficients shown are rounded; calculations use the constants directly. See <a href="https://www.itu.int/dms_pub/itu-r/opb/rep/R-REP-P.2345-2015-PDF-E.pdf" target="_blank" rel="noopener noreferrer">ITU horizon geometry</a>.</p></div>
+        <div><h3>A useful first approximation</h3><p>Area = πd², a theoretical circle in square miles. Radiation center AMSL = base elevation AMSL + radiation center AGL.</p><p>Assumes a smooth Earth and similar ground elevations at both ends. These heights are not HAAT (height above average terrain). Base elevation is not added to the horizon height.</p><p>The 8 m antenna setback is a rough convenience estimate, not FCC antenna data. Enter the actual radiation center when known. ZIP or coordinates do not change the results. Population and density are reserved for a future data integration.</p></div>
+      </div>
+    </section>
+    <section class="wuw-panel sources" id="sources" aria-labelledby="sourcesTitle">
+      <h2 class="wuw-panel-title" id="sourcesTitle"><svg class="wuw-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7l1 2 1-2h7v15h-7l-1 2-1-2H4zM12 6v15M7 8h2M15 8h2M7 12h2M15 12h2"/></svg>Sources &amp; reference desk</h2>
+      <div class="wuw-panel-content"><nav class="source-links" aria-label="Source links"><a href="https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistrationSearch.jsp" target="_blank" rel="noopener noreferrer">FCC ASR search</a><a href="https://www.fcc.gov/" target="_blank" rel="noopener noreferrer">FCC</a><a href="https://www.census.gov/" target="_blank" rel="noopener noreferrer">U.S. Census Bureau</a><a href="https://www.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a><a href="https://www.rabbitears.info/" target="_blank" rel="noopener noreferrer">RabbitEars ↗</a></nav><p class="hint">RabbitEars is linked as a courtesy. This independent calculator is not affiliated with or endorsed by RabbitEars, the FCC, the Census Bureau, or USGS. Educational estimates only.</p></div>
     </section>
   </main>
-  <footer class="wrap"><p class="footer-title">Reference desk</p><nav aria-label="Source links"><a href="https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistrationSearch.jsp" target="_blank" rel="noopener noreferrer">FCC ASR search</a><a href="https://www.fcc.gov/" target="_blank" rel="noopener noreferrer">FCC</a><a href="https://www.census.gov/" target="_blank" rel="noopener noreferrer">U.S. Census Bureau</a><a href="https://www.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a><a href="https://www.rabbitears.info/" target="_blank" rel="noopener noreferrer">RabbitEars ↗</a></nav><p class="hint">RabbitEars is linked as a courtesy. This independent calculator is not affiliated with or endorsed by RabbitEars, the FCC, the Census Bureau, or USGS. Educational estimates only.</p></footer>
+  <footer class="wuw-footer"><strong>Waypoint Utility Web</strong><span>Tower Horizon Calculator · VERSION 1.9 · STATUS: STABLE</span><span>Engineering estimates / field reference</span></footer>
 </body>
 </html>

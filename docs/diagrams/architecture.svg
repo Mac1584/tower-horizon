@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="480" viewBox="0 0 960 480" role="img" aria-labelledby="title desc">
+<title id="title">Tower Horizon Calculator 2.0 data flow</title>
+<desc id="desc">GitHub Pages sends tower, terrain and visibility requests to the existing Cloudflare Worker. The Worker serves the existing FCC tower lookup plus USGS EPQS elevation, USGS 3DEP profile and Census address lookup. Outputs include altitude above mean sea level, a terrain path profile and an approximate visibility map.</desc>
+<rect width="960" height="480" fill="#e5e7e8"/><rect x="13" y="13" width="934" height="49" fill="#193b58"/>
+<text x="30" y="42" fill="#ffffff" font-family="Arial, sans-serif" font-size="20" font-weight="bold">TOWER HORIZON CALCULATOR 2.0</text><text x="817" y="41" fill="#ffe29b" font-family="Arial,sans-serif" font-size="12">ARCHITECTURE</text>
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#355b76"/></marker></defs>
+<rect x="290" y="80" width="380" height="59" fill="#f7f8f9" stroke="#89949d"/><rect x="290" y="80" width="8" height="59" fill="#356641"/>
+<text x="480" y="104" text-anchor="middle" fill="#193b58" font-family="Arial,sans-serif" font-size="17" font-weight="bold">GITHUB PAGES — Browser Interface</text>
+<text x="480" y="125" text-anchor="middle" fill="#516371" font-family="Arial,sans-serif" font-size="13">Tower inputs · terrain chart · interactive map</text>
+<path d="M480 139V171" stroke="#355b76" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="290" y="181" width="380" height="65" fill="#fff3c1" stroke="#9e945e"/><rect x="290" y="181" width="8" height="65" fill="#356641"/>
+<text x="480" y="208" text-anchor="middle" fill="#193b58" font-family="Arial,sans-serif" font-size="18" font-weight="bold">CLOUDFLARE WORKER</text>
+<text x="480" y="230" text-anchor="middle" fill="#516371" font-family="Consolas, monospace" font-size="14">tower-data-api.mac1584.workers.dev</text>
+<path d="M480 246V266M128 266H832M128 266V291M362 266V291M597 266V291M832 266V291" stroke="#355b76" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<g font-family="Arial,sans-serif" text-anchor="middle">
+<rect x="19" y="301" width="218" height="85" fill="#f7f8f9" stroke="#89949d"/>
+<rect x="253" y="301" width="218" height="85" fill="#f7f8f9" stroke="#89949d"/>
+<rect x="488" y="301" width="218" height="85" fill="#f7f8f9" stroke="#89949d"/>
+<rect x="722" y="301" width="219" height="85" fill="#f7f8f9" stroke="#89949d"/>
+<text x="128" y="331" font-size="16" font-weight="bold" fill="#193b58">FCC / ASR</text><text x="128" y="355" font-size="13" fill="#516371">Existing tower lookup</text><text x="128" y="373" font-size="12" fill="#516371">Retain /tower</text>
+<text x="362" y="331" font-size="16" font-weight="bold" fill="#193b58">USGS EPQS</text><text x="362" y="355" font-size="13" fill="#516371">Ground elevation</text><text x="362" y="373" font-size="12" fill="#516371">/terrain/elevation</text>
+<text x="597" y="331" font-size="16" font-weight="bold" fill="#193b58">USGS 3DEP</text><text x="597" y="355" font-size="13" fill="#516371">Terrain line samples</text><text x="597" y="373" font-size="12" fill="#516371">/terrain/profile</text>
+<text x="832" y="331" font-size="16" font-weight="bold" fill="#193b58">US Census</text><text x="832" y="355" font-size="13" fill="#516371">Address coordinates</text><text x="832" y="373" font-size="12" fill="#516371">/terrain/geocode</text>
+</g>
+<rect x="19" y="408" width="922" height="49" fill="#d1d6da" stroke="#89949d"/>
+<text x="480" y="427" text-anchor="middle" fill="#193b58" font-size="14" font-weight="bold" font-family="Arial,sans-serif">RESULTS GENERATED IN BROWSER</text>
+<text x="480" y="446" text-anchor="middle" fill="#52616b" font-size="13" font-family="Arial,sans-serif">Antenna AMSL · Terrain profile · Line-of-sight clearance · Coarse 360° visibility area</text>
+</svg>

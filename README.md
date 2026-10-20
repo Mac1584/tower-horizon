@@ -1,29 +1,54 @@
-# Tower Horizon Calculator v1.9
+# Tower Horizon Calculator v2.0 — terrain beta
 
-Waypoint Utility Web edition. A static calculator for radio and geometric horizons, theoretical area, and radiation-center elevation. No build step, package installation, or API key is required.
+Feature branch: `feature/terrain-v2-usgs`. Existing production `main` remains untouched.
 
-## Files
+## Stage 1 — elevation
+- Enter transmitter latitude and longitude or use a tower lookup with FCC coordinates.
+- Select **Load USGS Elevation**. Ground elevation is displayed in feet AMSL.
+- Antenna AMSL = retrieved elevation + radiation center height AGL.
+- **Copy to Base Elevation** optionally updates the original calculator's AMSL input.
 
-- `index.html` — accessible calculator page, diagram, method, and sources.
-- `waypoint.css` — shared Waypoint Utility Web colors, navigation, headers, and footer.
-- `style.css` — tower calculator layout and responsive styles.
-- `script.js` — original tower calculation and FCC lookup code, unchanged.
-- `.nojekyll` — tells GitHub Pages to serve this static site directly.
+## Stage 2 — terrain profiles and line of sight
+- Set receiver coordinates by clicking the map, entering coordinates, or geocoding a U.S. address.
+- Select standard `k=4/3` or geometric `k=1`, then **Analyze Selected Path**.
+- Terrain samples are retrieved from USGS 3DEP. The SVG shows sampled apparent terrain including curvature and the straight-line effective-Earth path.
+- Negative minimum clearance means sampled terrain obstructs line of sight. Additional receiver/transmitter height estimates are mutually exclusive alternatives; they do not address Fresnel zones or diffraction.
 
-## Deploy to GitHub Pages
+## Stage 3 — 360-degree coarse viewshed
+- Choose 12, 24, or 36 bearings. The tool samples 80 elevation points on each radial and checks 40 distance rings.
+- The map shades mostly-clear/mostly-blocked cells; it reports an approximate visible area only if *all* bearings succeed. Unknown regions stay unshaded.
+- A coarse polar grid and interpolated terrain can miss narrow ridges and gaps; do not use this for service contours, aviation, safety, or engineering certification.
 
-1. Extract the ZIP. Upload **all files from inside the extracted folder** to the root of your GitHub repository. `index.html` should be at the repository root, with both stylesheets and `script.js` beside it. Include `.nojekyll` if your file picker shows hidden files.
-2. In the repository, open **Settings → Pages**. Choose **Deploy from a branch**, select your branch (usually `main`), and select **/ (root)**. Save.
-3. Open the Pages URL when deployment completes. All site assets use relative paths, so repository and custom-domain Pages sites both work.
+## Worker integration required for production reliability
+The current GitHub repository contains the website, not the source of the existing `tower-data-api` deployment. **This branch does not deploy or modify the live Cloudflare Worker.**
 
-For a local preview, open `index.html` in a browser. A local static web server is recommended when checking FCC lookups.
+`worker-terrain-extension.js` provides an ES module `handleTerrainRequest(request)` that implements:
+- `GET /terrain/elevation?lat=...&lon=...` using USGS EPQS
+- `POST /terrain/profile` using 3DEP `getSamples`
+- `GET /terrain/geocode?address=...` using the U.S. Census geocoder
 
-## Preserved behavior and data
+To integrate, copy the module into the Cloudflare Worker source, import `handleTerrainRequest`, and add this before the existing route handling:
 
-The horizon formulas, constants, input defaults, automatic 8 m radiation-center setback, manual override, negative base elevations, validation, and lookup behavior are unchanged from [Mac1584/tower-horizon](https://github.com/Mac1584/tower-horizon) `main`, whose files match the supplied local calculator. The interface was restyled; the calculation script is byte-identical to that source.
+```js
+const terrainResponse = await handleTerrainRequest(request);
+if (terrainResponse) return terrainResponse;
+```
 
-FCC ASRN lookup calls the existing external service at `https://tower-data-api.mac1584.workers.dev/tower?asrn=NUMBER`. It uses an imported FCC registration snapshot and requires internet access and service availability. Manual calculations run locally without it. ZIP/coordinates remain a reference label; terrain, geocoding, population, and population density are not connected. Radio horizon is a smooth-Earth estimate, not a predicted reception or coverage contour.
+Configure the Worker bundler so the module is included. Retain the existing FCC `/tower` route. Deploy with Wrangler **after reviewing and testing**. The web frontend tries the three new Worker routes first and falls back to direct USGS/Census endpoints when missing; direct browser requests may fail due to CORS, network policy, or provider rate limits. **Until the Worker module is deployed, end-to-end success is unverified.**
 
-## Local verification
+## Quick checks
+1. Test legacy FCC lookup and horizon calculation before and after integrating the module.
+2. Use Needham transmitter `42.29,-71.23`, verify USGS elevation and antenna AMSL.
+3. Click a nearby receiver on the map; run terrain path; verify chart and clearance.
+4. Set a receiver in mountainous terrain; verify blockage and required additional height.
+5. Run 12-bearing and 24-bearing analysis, ensuring any missing USGS data causes *Incomplete* rather than a misleading area.
+6. Test coordinate validation, browser console/network errors, and small screens.
+7. Compare representative profiles against an independent GIS profile before interpreting the viewshed area.
 
-Checked in a local browser against the original calculator: default and edited horizons/area/AMSL, automatic and manual radiation-center modes, zero/negative/blank/extreme input handling, location-label behavior, FCC success/error/timeout responses, keyboard access, labels/landmarks, and 320 px/390 px responsive layouts. All comparisons passed with no JavaScript errors or missing local assets. Live ASRN 1004233 lookup also succeeded on October 9, 2026, returning the October 7, 2026 FCC snapshot. No calculation changes were made.
+## References
+- USGS 3DEP ImageServer: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer
+- USGS EPQS: https://epqs.nationalmap.gov/v1/docs
+- U.S. Census geocoder: https://geocoding.geo.census.gov/geocoder/
+- Leaflet map: https://leafletjs.com/
+
+Source terrain surfaces generally do not represent structures, vegetation, or radio field strength. Vertical datum, resolution, uncertainty and endpoint elevation sampling need validation before operational use.

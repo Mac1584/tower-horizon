@@ -142,6 +142,9 @@ async function lookupTower(event) {
     const notes = [data.siteName, data.source, data.warning].filter((value) => typeof value === "string" && value.trim());
     lookupStatus(`ASRN ${asrn} loaded. ${notes.join(" ")} ${hasElevation ? "Base elevation loaded from the FCC record." : "Base elevation is unknown; enter it manually."}`);
     update();
+    if (Number.isFinite(Number(data.latitude)) && Number.isFinite(Number(data.longitude)) && data.latitude !== null && data.longitude !== null) {
+      window.dispatchEvent(new CustomEvent("towerCoordinatesLoaded", {detail:{lat:Number(data.latitude),lon:Number(data.longitude)}}));
+    }
   } catch (error) {
     const message = error.name === "AbortError"
       ? "The tower API timed out. Try again or continue with manual inputs."

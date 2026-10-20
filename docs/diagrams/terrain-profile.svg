@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="405" viewBox="0 0 940 405" role="img" aria-labelledby="title desc">
+<title id="title">Illustrative transmitter to receiver terrain profile</title>
+<desc id="desc">A tall transmitter on the left and a receiver on the right, with a dashed line of sight crossing an intervening ridgeline. Terrain clearance is negative at the obstruction; curvature and atmospheric refraction must be accounted for in actual calculations.</desc>
+<rect width="940" height="405" fill="#f7f8f9"/><rect x="11" y="12" width="918" height="46" fill="#193b58"/>
+<text x="28" y="42" font-size="20" fill="white" font-family="Arial,sans-serif" font-weight="bold">TERRAIN PATH PROFILE</text>
+<text x="730" y="41" font-size="12" fill="#ffe29b" font-family="Arial,sans-serif">ILLUSTRATIVE — NOT TO SCALE</text>
+<g stroke="#d9e1e5" stroke-width="1"><path d="M79 97H902M79 144H902M79 191H902M79 238H902M79 285H902M79 332H902"/></g>
+<text x="25" y="91" font-size="12" fill="#536575" font-family="Arial,sans-serif">AMSL</text>
+<path d="M80 333L103 305L129 296L153 286L179 305L218 309L258 283L288 277L312 258L340 213L376 168L397 138L417 151L443 185L470 251L500 279L541 292L581 285L616 272L655 291L700 302L749 286L795 290L849 298L902 308L902 333Z" fill="#c5d7c5" stroke="#467953" stroke-width="2.5"/>
+<g stroke="#193b58" stroke-width="3" fill="none"><path d="M140 292L150 94L161 294M144 242H157M147 203H156M146 169H158M148 125H154"/><path d="M803 292V248"/></g>
+<circle cx="150" cy="94" r="5" fill="#193b58"/><circle cx="803" cy="248" r="5" fill="#193b58"/>
+<path d="M150 94L803 248" fill="none" stroke="#245c88" stroke-width="3" stroke-dasharray="10 7"/>
+<path d="M387 142L425 159" fill="none" stroke="#b04a3d" stroke-width="6" stroke-linecap="round"/>
+<circle cx="405" cy="150" r="16" fill="#fff3c1" stroke="#bb923a"/><text x="405" y="157" font-size="22" fill="#9e473c" text-anchor="middle" font-family="Arial,sans-serif">!</text>
+<text x="145" y="82" text-anchor="middle" fill="#193b58" font-size="14" font-family="Arial,sans-serif" font-weight="bold">TX</text>
+<text x="812" y="237" fill="#193b58" font-size="14" font-family="Arial,sans-serif" font-weight="bold">RX</text>
+<path d="M426 130L485 98L611 98" fill="none" stroke="#b04a3d" stroke-width="1.5"/>
+<text x="614" y="103" fill="#923c31" font-size="13" font-family="Arial,sans-serif" font-weight="bold">Obstruction / negative clearance</text>
+<text x="400" y="365" text-anchor="middle" fill="#52616b" font-family="Arial,sans-serif" font-size="13">Ground distance →</text>
+<rect x="78" y="376" width="784" height="18" fill="#e5e7e8"/>
+<text x="470" y="389" text-anchor="middle" fill="#405263" font-family="Arial,sans-serif" font-size="12">USGS bare-earth terrain + effective-Earth curvature; buildings and trees not included</text>
+</svg>

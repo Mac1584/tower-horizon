@@ -67,3 +67,25 @@ h3 { color: #193b58; font-size: 12px; margin: 0 0 7px; }
   .diagram-metric { align-items: flex-start; flex-direction: column; }
 }
 @media print { .workspace { grid-template-columns: minmax(0,1fr) minmax(0,1fr); } .wuw-panel { break-inside: avoid; } .wuw-panel-title.major { color: black; background: #d1d6da; } }
+
+/* USGS 3DEP terrain analysis panels */
+.terrain-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0}
+.terrain-subpanel{background:#f1f3f4;border:1px solid #89949d;padding:14px;min-width:0}
+.terrain-subpanel h3{background:#d1d6da;border-bottom:1px solid #89949d;margin:-14px -14px 14px;padding:9px 12px}
+.terrain-subpanel button{margin-top:8px;margin-right:4px}
+.terrain-subpanel select{background:#fff;border:1px solid #89949d;padding:9px;width:100%;min-height:40px;color:#25323a}
+.terrain-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.terrain-metrics>div{background:#fff;border:1px solid #89949d;padding:12px;min-width:0}
+.terrain-metrics span{font-size:11px;color:#193b58;font-weight:bold;display:block}
+.terrain-metrics strong{display:block;margin-top:5px;font:bold 19px Arial,sans-serif;overflow-wrap:anywhere}
+.terrain-metrics .wide{grid-column:1/-1}
+.terrain-ok{color:#356641}.terrain-blocked{color:#a13b31}
+.terrain-chart-wrap{background:#fff;border:1px solid #89949d;margin:10px 0 18px}
+.terrain-chart-wrap svg{display:block;width:100%;height:auto}
+.terrain-coverage{margin-top:12px}
+.terrain-coverage-options{display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+.terrain-coverage-options>div{width:220px;max-width:100%}
+#terrainMap{height:400px;width:100%;background:#e2e9ec;border:1px solid #89949d}
+.legend{display:inline-block;margin:0 12px 4px 0;padding:2px 5px;border-left:5px solid}
+.legend.green{border-color:#3d985d}.legend.red{border-color:#c36a5c}.legend.blue{border-color:#1f557f}
+@media(max-width:720px){.terrain-controls{grid-template-columns:minmax(0,1fr)}#terrainMap{height:310px}}

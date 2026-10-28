@@ -9,6 +9,7 @@
   const fmt = (n, d = 1) => Number.isFinite(n) ? n.toLocaleString("en-US", { maximumFractionDigits: d }) : "—";
   let map = null, towerMarker = null, receiverMarker = null, horizonCircle = null;
   let visibilityLayer = null, lastTxElevation = null, currentProfile = null, coverageRun = 0, analysisCounter = 0;
+  let coverageSnapshot = null;
   const profileCache = new Map();
   const deg = (n) => n * RAD;
   const rad = (n) => n / RAD;
@@ -289,6 +290,8 @@
   }
   function invalidateTerrain() {
     currentProfile = null;
+    coverageSnapshot = null;
+    window.dispatchEvent(new Event("towerCoverageCleared"));
     coverageRun++;
     $("analyzeCoverage").disabled = false;
     if (visibilityLayer) visibilityLayer.clearLayers();
@@ -411,10 +414,14 @@
       return status("terrainCoverageStatus", "Radio-horizon radius is too small for this sampling mode.", true);
 
     const runId = ++coverageRun;
+    coverageSnapshot = null;
+    window.dispatchEvent(new Event("towerCoverageCleared"));
     $("analyzeCoverage").disabled = true;
     if (visibilityLayer) visibilityLayer.clearLayers();
     $("terrainArea").textContent = "Calculating...";
     const rays = Array(bearings).fill(null);
+    const radialProfiles = Array(bearings).fill(null);
+    const radialMethods = Array(bearings).fill(null);
     const errors = [];
     let completed = 0, stoppedEarly = false, endpointsRecovered = 0;
     let multipointCount = 0, legacyCount = 0;
@@ -447,6 +454,10 @@
                 else legacyCount++;
                 if (repaired.recovered) endpointsRecovered++;
                 rays[index] = visibility;
+                radialProfiles[index] = repaired.samples.map(p => ({
+                  lat: p.lat, lon: p.lon, distanceM: p.d, elevationM: p.elev
+                }));
+                radialMethods[index] = radial.method;
               } catch (error) {
                 if (runId !== coverageRun) return;
                 const reason = error.name === "AbortError" ? "Worker request timed out" :
@@ -477,19 +488,36 @@
       if (runId !== coverageRun) return;
       const missing = rays.filter(x => !x).length;
       let mappedArea = 0, unknownSectors = 0;
+      const cells = [];
+      const sectorVertices = (startDeg, endDeg, innerM, outerM) => [
+        destination(tx, startDeg, innerM),
+        destination(tx, startDeg, outerM),
+        destination(tx, endDeg, outerM),
+        destination(tx, endDeg, innerM)
+      ];
       for (let b = 0; b < bearings; b++) {
         const nextB = (b + 1) % bearings, a0 = b * 360 / bearings, a1 = (b + 1) * 360 / bearings;
         // Both bounding radials must have valid terrain samples for a sector
         // to be classified. Otherwise shade it gray, never red or green.
         if (!rays[b] || !rays[nextB]) {
           unknownSectors++;
+          for (let ring = 0; ring < rings; ring++) {
+            cells.push({
+              bearingStartDeg: a0, bearingEndDeg: a1, ringIndex: ring + 1,
+              innerMeters: radiusM * ring / rings,
+              outerMeters: radiusM * (ring + 1) / rings,
+              status: "unknown", visibleFraction: null,
+              vertices: sectorVertices(a0, a1, radiusM * ring / rings,
+                radiusM * (ring + 1) / rings)
+            });
+          }
           if (visibilityLayer && map) {
             const outerArc = Array.from({ length: 7 }, (_, step) =>
               destination(tx, a0 + (a1 - a0) * step / 6, radiusM));
             const coords = [[tx.lat, tx.lon], ...outerArc.map(p => [p.lat, p.lon])];
             window.L.polygon(coords, {
-              color: "#727c86", weight: 1, opacity: 0.7, dashArray: "4 4",
-              fill: true, fillColor: "#949ba3", fillOpacity: 0.27, interactive: false
+              color: "#626b75", weight: 1, opacity: 0.75, dashArray: "4 4",
+              fill: true, fillColor: "#626b75", fillOpacity: 0.54, interactive: false
             }).addTo(visibilityLayer);
           }
           continue;
@@ -498,21 +526,51 @@
           const count = [rays[b][ring], rays[b][ring + 1], rays[nextB][ring], rays[nextB][ring + 1]].filter(Boolean).length;
           const inner = radiusM * ring / rings, outer = radiusM * (ring + 1) / rings;
           mappedArea += ((count / 4) * Math.PI * (outer * outer - inner * inner) / bearings);
+          const classification = count >= 2 ? "terrain_clear" : "terrain_blocked";
+          cells.push({
+            bearingStartDeg: a0, bearingEndDeg: a1, ringIndex: ring + 1,
+            innerMeters: inner, outerMeters: outer,
+            status: classification, visibleFraction: count / 4,
+            vertices: sectorVertices(a0, a1, inner, outer)
+          });
           if (visibilityLayer && map) {
             const coords = [destination(tx, a0, inner), destination(tx, a0, outer),
               destination(tx, a1, outer), destination(tx, a1, inner)].map(p => [p.lat, p.lon]);
             window.L.polygon(coords, {
-              stroke: false, fill: true, fillColor: count >= 2 ? "#3d985d" : "#c36a5c",
-              fillOpacity: count >= 2 ? 0.31 : 0.22, interactive: false
+              stroke: false, fill: true, fillColor: count >= 2 ? "#126e42" : "#aa2d30",
+              fillOpacity: count >= 2 ? 0.60 : 0.58, interactive: false
             }).addTo(visibilityLayer);
           }
         }
       }
       if (horizonCircle && map) horizonCircle.setLatLng([tx.lat, tx.lon]).setRadius(radiusM);
       else if (map) horizonCircle = window.L.circle([tx.lat, tx.lon], {
-        radius: radiusM, color: "#1f557f", weight: 2, fill: false, dashArray: "7 5"
+        radius: radiusM, color: "#184c83", weight: 2.5, fill: false, dashArray: "7 5"
       }).addTo(map);
       if (map) map.fitBounds(horizonCircle.getBounds(), { padding: [15, 15] });
+
+      // Preserve complete/partial results for CSV, KML, and report exports.
+      // The summary never treats unknown sectors as confirmed terrain clearance.
+      coverageSnapshot = {
+        generatedAt: new Date().toISOString(),
+        tx, txHeightFt: txFt, rxHeightFt: rxFt, k,
+        bearings, rings, samplesPerBearing, radiusM,
+        complete: missing === 0, failedBearings: missing, unknownSectors,
+        terrainVisibleAreaSqMi: missing === 0 ? mappedArea / (MI * MI) : null,
+        radialData: rays.map((vis, i) => {
+          const angle = 360 * i / bearings;
+          const failure = errors.find(error => error.angle === angle);
+          return {
+            bearingDeg: angle,
+            status: vis ? "complete" : "missing",
+            queryMethod: radialMethods[i],
+            samples: radialProfiles[i], visibility: vis,
+            error: failure ? failure.reason : null
+          };
+        }),
+        cells
+      };
+      window.dispatchEvent(new Event("towerCoverageUpdated"));
 
       if (missing) {
         $("terrainArea").textContent = "Incomplete";
@@ -549,8 +607,9 @@
     }
     const tx = point("terrainTxLat", "terrainTxLon"), rx = point("terrainRxLat", "terrainRxLon");
     map = window.L.map("terrainMap", { scrollWheelZoom: false }).setView([tx.lat, tx.lon], 9);
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"
+    window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18, crossOrigin: "anonymous",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
     }).addTo(map);
     visibilityLayer = window.L.layerGroup().addTo(map);
     towerMarker = window.L.marker([tx.lat, tx.lon]).addTo(map).bindPopup("Transmitter");
@@ -571,6 +630,9 @@
     $("geocodeReceiver").addEventListener("click", geocodeReceiver);
     $("analyzePath").addEventListener("click", analyzeSelectedPath);
     $("analyzeCoverage").addEventListener("click", analyzeCoverage);
+    $("terrainBasemap").addEventListener("change", () => {
+      $("terrainMap").classList.toggle("terrain-map-muted", $("terrainBasemap").value === "muted");
+    });
     // Mirror receiver height between the original calculator and terrain panel.
     const terrainHeight = $("terrainReceiverHeight");
     const mainHeight = $("receiverHeight");
@@ -611,6 +673,11 @@
       }
     });
     initializeMap();
+    window.TowerHorizonData = Object.freeze({
+      getMap: () => map,
+      getCoverage: () => coverageSnapshot,
+      getProfile: () => currentProfile
+    });
     updateAntennaDisplay();
   }
   wire();

@@ -793,9 +793,13 @@
           status("terrainCoverageStatus",
             "Recovery data loaded but map refresh failed: " + error.message, true));
       } else {
-        status("terrainCoverageStatus",
-          "Five-minute recovery ended without verified new terrain data. " +
-          "Gray unknown sectors remain. You may run a new analysis later.", true);
+        const reason = data.reason === "timeout" ? "The five-minute recovery period expired" :
+          data.reason === "partial" ? "USGS returned non-retryable missing terrain" :
+          data.reason === "stopped" ? "Recovery was stopped" :
+          "The recovery window finished";
+        status("terrainCoverageStatus", reason +
+          " without verified new terrain data. Gray unknown sectors remain. " +
+          "You may run a new analysis later.", true);
       }
     }
   }

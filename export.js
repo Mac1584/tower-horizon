@@ -33,7 +33,11 @@
   }
   function csvValue(value) {
     if (value === null || value === undefined) return "";
-    const str = String(value);
+    let str = String(value);
+    // Prevent user-supplied location labels or error text from being treated
+    // as spreadsheet formulas when the downloaded CSV is opened in Excel.
+    if (/^[=+@\t\r]/.test(str) || (/^-/.test(str) && !/^-\d+(?:\.\d+)?$/.test(str)))
+      str = "'" + str;
     return /[,"\r\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
   }
   function toCSV(rows) {

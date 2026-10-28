@@ -144,6 +144,12 @@
       <p class="hint">Coarse approximation using 40 distance rings per bearing, bounded by the standard radio horizon (maximum 120 mi). This is not an FCC service contour. Unknown sample regions are shaded gray.</p>
       <div class="terrain-metrics"><div><span>Estimated terrain-visible area</span><strong id="terrainArea">—</strong></div></div>
       <p class="status" id="terrainCoverageStatus" role="status">Run the 360° analysis to update the map.</p>
+      <div id="terrainRecoveryOption" class="terrain-recovery-option" hidden>
+        <div class="terrain-recovery-heading">OPTIONAL RECOVERY | USGS TEMPORARILY UNAVAILABLE</div>
+        <p>The scan still has transient service errors after two automatic retries. You can open a separate window to retry only those bearings for up to five minutes. The current map remains available with unknown sectors shaded gray.</p>
+        <button id="openTerrainRecovery" type="button">Open 5-minute recovery window</button>
+        <p id="terrainRecoveryStatus" class="status" role="status" aria-live="polite"></p>
+      </div>
       <div id="terrainMap" class="terrain-map-muted" aria-label="Map to select receiver and display estimated terrain-visibility results"></div>
       <div class="terrain-downloads" aria-label="Download terrain analysis">
         <p class="terrain-download-title">EXPORT &amp; REPORTING <span class="optional">Current calculation / current map view</span></p>

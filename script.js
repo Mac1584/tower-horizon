@@ -194,6 +194,9 @@ function censusAddressJSONP(address) {
   });
 }
 
+// Shared JSONP helper for both the transmitter and receiver address fields.
+window.towerCensusGeocode = censusAddressJSONP;
+
 async function locateTransmitter() {
   const raw = byId("location").value.trim();
   const button = byId("locateInput");

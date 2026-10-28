@@ -115,7 +115,8 @@ This map is deliberately coarse. Boundary sectors, narrow valleys, ridges, build
 |---|---|
 | `index.html` | Web app with original calculator and new terrain panels |
 | `script.js` | Existing smooth-Earth horizon math and FCC lookup; dispatches valid FCC coordinates |
-| `terrain.js` | USGS calls, address selection, path visibility, profile SVG chart, coarse 360-degree view |
+| `terrain.js` | USGS calls, address selection, path visibility, profile SVG chart, coarse 360-degree view and structured export snapshots |
+| `export.js` | CSV, KML, JPEG and PDF exports, including the US Letter one-page report |
 | `style.css` | Calculator/terrain layouts, map and charts |
 | `waypoint.css` | Shared dark-navy and gray Waypoint Utility Web visual system |
 | `worker-terrain-extension.js` | **Integration module only**; adds USGS/Census routes to existing Worker |
@@ -125,6 +126,17 @@ This map is deliberately coarse. Boundary sectors, narrow valleys, ridges, build
 | `docs/diagrams/architecture.svg` | System architecture diagram |
 | `docs/diagrams/terrain-profile.svg` | Terrain line-of-sight diagram |
 | `docs/diagrams/coverage-map.svg` | 360-degree visibility map diagram |
+
+## Version 2.0 UX and export features (development branch)
+
+- **Location first:** the primary Location field accepts latitude/longitude pairs, complete U.S. street addresses, or five-digit ZIP codes. Street-address matches use the official U.S. Census JSONP geocoder because the Census API does not support direct browser CORS; geocodes are approximate and need confirmation. ZIP codes use an approximate geographic center from Zippopotam.us. The FCC ASRN lookup is optional and appears in a smaller panel below.
+- **Background styling:** choose a muted grayscale OpenStreetMap background or the regular color tiles. The terrain overlay is more saturated and opaque so green/blocked/gray sectors remain distinct; attribution stays visible.
+- **CSV:** download the 360° radial profile samples, elevations, and per-ring line-of-sight classifications, with scan metadata and errors.
+- **KML:** export colored coverage polygons, including gray unknown sectors, for use with Google Earth and compatible applications. KML represents preliminary modeled terrain visibility, not FCC contour data.
+- **Map JPEG and Map PDF:** export the current displayed map. The browser first attempts to capture displayed tiles with html2canvas; where browser/cross-origin restrictions prevent this, it exports a clearly labeled schematic map with the actual overlay instead.
+- **One-page PDF report:** creates a native one-page **US Letter (8.5 × 11 in)** PDF with inputs, main results, map, profile chart (when calculated), and model limitations using jsPDF. Reports identify unknown/incomplete terrain analysis.
+
+Map image and PDF exports run in the browser and require the pinned html2canvas 1.4.1 and jsPDF 2.5.2 client libraries to load. No export uploads your data to a separate server. Map tiles remain subject to OpenStreetMap attribution and usage policy. Use caution: grayscale styling is a visual filter on the existing OSM raster tiles, not a separate map service.
 
 ## Getting started
 

@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Estimate a broadcast tower's radio and geometric horizons from antenna and receiver heights. Tower Horizon Calculator v2.0 from Waypoint Utility Web.">
-  <title>Tower Horizon Calculator v1.9 — Waypoint Utility Web</title>
+  <title>Tower Horizon Calculator v2.0 — Waypoint Utility Web</title>
   <link rel="stylesheet" href="waypoint.css">
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="vendor/leaflet-1.9.4.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
   <script src="script.js" defer></script>
   <script src="terrain.js" defer></script>
@@ -120,7 +120,7 @@
         <label for="terrainRxAddress">Street address (U.S. Census geocoder)</label>
         <div class="lookup-row"><input id="terrainRxAddress" placeholder="City Hall, Boston, MA (full address recommended)"><button id="geocodeReceiver" type="button">Find Address</button></div>
         <div class="input-grid"><div><label for="terrainRxLat">RX latitude</label><input id="terrainRxLat" type="number" step="any" value="42.3601"></div><div><label for="terrainRxLon">RX longitude</label><input id="terrainRxLon" type="number" step="any" value="-71.0589"></div></div>
-        <p class="hint">Or click the map to set the receiver. Receiver height comes from the main calculator above.</p>
+        <div class="terrain-height-link"><label for="terrainReceiverHeight">Receiver antenna height <span class="optional">ft AGL (above ground level)</span></label><input id="terrainReceiverHeight" type="number" min="0" step="any" value="6" aria-describedby="terrainReceiverHeightHelp"><p class="hint" id="terrainReceiverHeightHelp">Mirrors the Receiver height input in the calculator above. Changing either field updates the other automatically.</p></div><p class="hint">Or click the map to set the receiver location.</p>
         <div class="input-grid"><div><label for="terrainK">Effective Earth-radius factor</label><select id="terrainK"><option value="1.3333333333333" selected>k = 4/3 (standard)</option><option value="1">k = 1 (geometric)</option></select></div><div><label for="terrainSamples">Terrain samples per path</label><select id="terrainSamples"><option value="48">48 (fast)</option><option value="72" selected>72 (standard)</option><option value="120">120 (detailed)</option></select></div></div>
         <button id="analyzePath" type="button">Analyze Selected Path</button>
         <p id="terrainPathStatus" class="status" role="status">Select a receiver and run the path analysis.</p>

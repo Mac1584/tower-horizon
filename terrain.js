@@ -492,12 +492,15 @@
       const missing = rays.filter(x => !x).length;
       let mappedArea = 0, unknownSectors = 0;
       const cells = [];
-      const sectorVertices = (startDeg, endDeg, innerM, outerM) => [
-        destination(tx, startDeg, innerM),
-        destination(tx, startDeg, outerM),
-        destination(tx, endDeg, outerM),
-        destination(tx, endDeg, innerM)
-      ];
+      // Use curved annular-sector edges for faithful KML/vector exports.
+      const sectorVertices = (startDeg, endDeg, innerM, outerM) => {
+        const angles = Array.from({ length: 7 }, (_, i) =>
+          startDeg + (endDeg - startDeg) * i / 6);
+        return [
+          ...angles.map(angle => destination(tx, angle, outerM)),
+          ...angles.reverse().map(angle => destination(tx, angle, innerM))
+        ];
+      };
       for (let b = 0; b < bearings; b++) {
         const nextB = (b + 1) % bearings, a0 = b * 360 / bearings, a1 = (b + 1) * 360 / bearings;
         // Both bounding radials must have valid terrain samples for a sector

@@ -89,3 +89,8 @@ h3 { color: #193b58; font-size: 12px; margin: 0 0 7px; }
 .legend{display:inline-block;margin:0 12px 4px 0;padding:2px 5px;border-left:5px solid}
 .legend.green{border-color:#3d985d}.legend.red{border-color:#c36a5c}.legend.blue{border-color:#1f557f}
 @media(max-width:720px){.terrain-controls{grid-template-columns:minmax(0,1fr)}#terrainMap{height:310px}}
+
+/* Height control repeated in terrain panel; both fields are synchronized. */
+.terrain-height-link{margin:12px 0;padding:12px;background:#fff;border:1px solid #89949d;border-left:4px solid #356641}
+.terrain-height-link input{max-width:230px}
+.terrain-height-link .hint{margin-bottom:0}

@@ -62,6 +62,7 @@
     updateDisplay();
     const finalMessage = reason === "recovered" ? "All requested bearings recovered." :
       reason === "timeout" ? "The five-minute recovery limit has elapsed." :
+      reason === "partial" ? "All eligible requests were attempted; some returned non-retryable missing data." :
       reason === "parent-closed" ? "Original calculator is no longer available." :
       reason === "invalid-data" ? "Recovery configuration was invalid." :
       "Recovery stopped.";
@@ -71,7 +72,8 @@
       type: "tower-terrain-recovery-finished",
       token: session.token,
       reason, recoveredBearings: [...session.success],
-      remainingBearings: session.pending.map(item => item.bearingDeg)
+      remainingBearings: session.pending.map(item => item.bearingDeg),
+      unrecoverableBearings: [...session.unrecoverable]
     });
   }
   function validateSetup(data) {
@@ -146,6 +148,7 @@
           if (!transient(error)) {
             // An actual gap or invalid payload is not a temporary outage.
             session.pending = session.pending.filter(p => p !== task);
+            session.unrecoverable.add(task.bearingDeg);
             log("Bearing " + task.bearingDeg + "°: not retryable (" +
               task.lastError + "). This sector remains unknown.");
           } else {
@@ -162,7 +165,8 @@
       await delay(Math.min(REST_MS, session.deadline - now()));
     }
     if (!closed) stop(now() >= session.deadline ? "timeout" :
-      session.pending.length ? "stopped" : "recovered");
+      session.success.size === session.total ? "recovered" :
+      session.unrecoverable.size ? "partial" : "stopped");
   }
   window.addEventListener("message", event => {
     if (event.origin !== window.location.origin ||
@@ -182,6 +186,7 @@
       token: data.token, workerUrl: data.workerUrl, tx: data.tx,
       samples: data.samples, pending: data.bearings.map(p => ({...p, attempts: 0})),
       total: data.bearings.length, success: new Set(),
+      unrecoverable: new Set(),
       deadline: now() + MAX_MS
     };
     $("stopRecovery").disabled = false;
@@ -197,6 +202,9 @@
     });
   });
   $("stopRecovery").addEventListener("click", () => stop("stopped"));
+  window.addEventListener("pagehide", () => {
+    if (!closed && session) stop("stopped");
+  });
   $("stopRecovery").disabled = true;
   if (!parentAvailable()) {
     announce("Open this window using the Recover button in Tower Horizon.");

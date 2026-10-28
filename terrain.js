@@ -147,6 +147,60 @@
     profileCache.set(profileKey(tx, rx, n), completed);
     return { samples: completed, recovered: true };
   }
+  // Request explicit, equally spaced geographic samples for 360-degree radials.
+  // The staging Worker needs the /terrain/multipoint handler to activate this.
+  // Until deployed, a 404 uses the existing (legacy) polyline route.
+  async function getRadialProfile(tx, rx, n = 48) {
+    const key = "multipoint|" + profileKey(tx, rx, n);
+    if (profileCache.has(key)) return { samples: profileCache.get(key), method: "multipoint" };
+    let data;
+    try {
+      data = await fetchJSON(TOWER_API + "/terrain/multipoint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tx, rx, samples: n })
+      }, 35000);
+    } catch (error) {
+      if (error.httpStatus !== 404 && error.httpStatus !== 405) throw error;
+      // Preserve the existing, verified single-path backend until the new
+      // route is deployed. Never claim that fallback is multipoint sampling.
+      return { samples: await getProfile(tx, rx, n), method: "polyline" };
+    }
+    if (data.sampleMethod !== "multipoint" || data.requestedCount !== n ||
+        !Array.isArray(data.samples) || data.samples.length !== n)
+      throw new Error("Invalid multipoint response from the terrain Worker");
+    const missing = [];
+    const total = distance(tx, rx);
+    const samples = data.samples.map((entry, i) => {
+      if (!entry || entry.index !== i || entry.value == null ||
+          entry.value === "" || !Number.isFinite(Number(entry.value))) {
+        missing.push(i);
+        return null;
+      }
+      const elevation = Number(entry.value);
+      if (elevation < -1500 || elevation > 9000) {
+        missing.push(i);
+        return null;
+      }
+      const location = samplePoint(entry.location);
+      if (!validLatLon(location)) {
+        missing.push(i);
+        return null;
+      }
+      return { lat: location.lat, lon: location.lon, d: total * i / (n - 1), elev: elevation };
+    });
+    if (missing.length)
+      throw new Error("USGS has no valid elevation at " + missing.length + " of " + n +
+        " requested points (indices: " + missing.slice(0, 6).join(", ") +
+        (missing.length > 6 ? ", ..." : "") + ")");
+    // Preserve the exact receiver endpoint distance to avoid a floating-point
+    // mismatch at the final visibility ring.
+    samples[samples.length - 1].d = total;
+    if (profileCache.size > 100) profileCache.clear();
+    profileCache.set(key, samples);
+    return { samples, method: "multipoint" };
+  }
+
   function analyze(samples, txAgl, rxAgl, k) {
     const D = samples[samples.length - 1].d;
     if (D <= 0 || k <= 0) throw new Error("A positive path distance and Earth-radius factor are required.");
@@ -310,7 +364,12 @@
     finally { $("analyzePath").disabled = false; }
   }
   function sampleAt(samples, meters) {
-    if (!samples || !samples.length || meters > samples[samples.length - 1].d + 1) return null;
+    if (!samples || !samples.length) return null;
+    const end = samples[samples.length - 1];
+    // Floating point roundoff can put the horizon-ring distance a fraction
+    // of a meter beyond a valid last sample. This is NOT a terrain-data gap.
+    if (meters > end.d + 0.5) return null;
+    if (meters >= end.d) return end.elev;
     if (meters <= samples[0].d) return samples[0].elev;
     for (let i = 1; i < samples.length; i++) {
       if (samples[i].d >= meters) {
@@ -358,6 +417,7 @@
     const rays = Array(bearings).fill(null);
     const errors = [];
     let completed = 0, stoppedEarly = false, endpointsRecovered = 0;
+    let multipointCount = 0, legacyCount = 0;
 
     try {
       // Complete four sequential chunks. Within each chunk, fetch at most
@@ -375,12 +435,16 @@
             return (async () => {
               try {
                 const rx = destination(tx, angle, radiusM);
-                const profile = await getProfile(tx, rx, samplesPerBearing);
+                const radial = await getRadialProfile(tx, rx, samplesPerBearing);
                 if (runId !== coverageRun) return;
-                const repaired = await recoverRadialEndpoint(profile, tx, rx, samplesPerBearing);
+                const repaired = radial.method === "multipoint"
+                  ? { samples: radial.samples, recovered: false }
+                  : await recoverRadialEndpoint(radial.samples, tx, rx, samplesPerBearing);
                 if (runId !== coverageRun) return;
                 const visibility = radialVisibility(repaired.samples, rings, radiusM, txFt / FT, rxFt / FT, k);
-                if (!visibility) throw new Error("Missing elevation samples after endpoint verification");
+                if (!visibility) throw new Error("Missing valid elevation samples at distance rings");
+                if (radial.method === "multipoint") multipointCount++;
+                else legacyCount++;
                 if (repaired.recovered) endpointsRecovered++;
                 rays[index] = visibility;
               } catch (error) {
@@ -398,7 +462,9 @@
           if (runId !== coverageRun) return;
           status("terrainCoverageStatus", "Chunk " + (chunk + 1) + " / " + chunks +
             ": " + completed + " / " + bearings + " bearings checked (" +
-            errors.length + " failed; " + endpointsRecovered + " endpoints recovered)");
+            errors.length + " failed; " + multipointCount +
+            " multipoint, " + legacyCount + " legacy, " +
+            endpointsRecovered + " endpoints recovered)");
         }
         // If every request in the first chunk fails, continuing with nine
         // more expensive requests cannot produce a complete area estimate.
@@ -457,13 +523,16 @@
         status("terrainCoverageStatus", summary +
           unknownSectors + " sectors are shaded gray because one or both boundary radials lack data. " +
           endpointsRecovered + " radial endpoints were recovered with USGS EPQS. " +
-          "No reliable total area is reported." +
+          "No reliable total area is reported. " +
+          (legacyCount ? legacyCount + " successful radials used legacy polyline queries; " +
+            "multipoint requires the staging Worker update. " : "") +
           (examples ? " First errors: " + examples : ""), true);
       } else {
         $("terrainArea").textContent = fmt(mappedArea / (MI * MI), 0) + " mi²";
         status("terrainCoverageStatus", "Completed all 4 chunks: " + bearings + " bearings × " +
           samplesPerBearing + " terrain samples (plus " + endpointsRecovered +
-          " verified endpoint repairs), " + rings + " distance rings. Restricted to a smooth-Earth horizon (" +
+          " verified endpoint repairs), " + rings + " distance rings. " +
+          multipointCount + " multipoint / " + legacyCount + " legacy radial queries. Restricted to a smooth-Earth horizon (" +
           fmt(radiusM / MI) + " mi). Buildings, diffraction and field strength are not modeled.");
       }
     } catch (error) {

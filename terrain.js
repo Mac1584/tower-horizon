@@ -423,7 +423,30 @@
     }
     return visible;
   }
-  async function analyzeCoverage() {
+  // Two bounded automatic retries for transient HTTP failures and timeouts.
+  // Retry delays are deliberately small but nonzero, and no new terrain
+  // requests are scheduled once the current scan is invalidated.
+  async function radialWithRetries(tx, rx, n, angle, runId, cacheOnly, onRetry) {
+    const waits = [1500, 3500];
+    for (let attempt = 0; attempt <= waits.length; attempt++) {
+      if (runId !== coverageRun) throw new Error("Terrain scan was cancelled");
+      try {
+        return { ...(await getRadialProfile(tx, rx, n, cacheOnly)), attempts: attempt + 1 };
+      } catch (error) {
+        if (cacheOnly || !isTransientTerrainError(error) || attempt === waits.length)
+          throw error;
+        onRetry(attempt + 1, error);
+        await new Promise(resolve => setTimeout(resolve,
+          waits[attempt] + Math.round(Math.random() * 350)));
+      }
+    }
+    throw new Error("Unable to recover terrain bearing " + angle);
+  }
+
+  async function analyzeCoverage(options = {}) {
+    const cacheOnly = options.cacheOnly === true;
+    const previousSnapshot = cacheOnly ? coverageSnapshot : null;
+    if (!cacheOnly) stopTerrainRecovery("A new terrain scan has started.");
     const tx = point("terrainTxLat", "terrainTxLon");
     const txFt = Number($("radCenter").value), rxFt = Number($("receiverHeight").value), k = Number($("terrainK").value);
     if (!validLatLon(tx) || !Number.isFinite(txFt) || !Number.isFinite(rxFt) || txFt < 0 || rxFt < 0 || !Number.isFinite(k) || k <= 0)
@@ -449,7 +472,7 @@
     const radialMethods = Array(bearings).fill(null);
     const errors = [];
     let completed = 0, stoppedEarly = false, endpointsRecovered = 0;
-    let multipointCount = 0, legacyCount = 0;
+    let multipointCount = 0, legacyCount = 0, retryCount = 0, cacheHitCount = 0;
 
     try {
       // Complete four sequential chunks. Within each chunk, fetch at most
@@ -467,8 +490,19 @@
             return (async () => {
               try {
                 const rx = destination(tx, angle, radiusM);
-                const radial = await getRadialProfile(tx, rx, samplesPerBearing);
+                const key = "multipoint|" + profileKey(tx, rx, samplesPerBearing);
+                const wasCached = profileCache.has(key) ||
+                  profileCache.has(profileKey(tx, rx, samplesPerBearing));
+                const radial = await radialWithRetries(tx, rx, samplesPerBearing,
+                  angle, runId, cacheOnly, (attempt, error) => {
+                    retryCount++;
+                    if (runId === coverageRun) status("terrainCoverageStatus",
+                      "Temporary USGS error at " + angle + "° (" +
+                      (error.httpStatus ? "HTTP " + error.httpStatus : error.name) +
+                      "). Automatic retry " + attempt + " of 2…");
+                  });
                 if (runId !== coverageRun) return;
+                if (wasCached) cacheHitCount++;
                 const repaired = radial.method === "multipoint"
                   ? { samples: radial.samples, recovered: false }
                   : await recoverRadialEndpoint(radial.samples, tx, rx, samplesPerBearing);
@@ -487,7 +521,14 @@
                 if (runId !== coverageRun) return;
                 const reason = error.name === "AbortError" ? "Worker request timed out" :
                   String(error.message || error);
-                errors.push({ angle, reason });
+                const original = cacheOnly
+                  ? previousSnapshot?.radialData?.[index] : null;
+                errors.push({
+                  angle,
+                  reason: original?.error || reason,
+                  retryable: !cacheOnly && isTransientTerrainError(error),
+                  httpStatus: error.httpStatus || null
+                });
                 console.warn("Terrain bearing " + angle + "° failed:", error);
               } finally {
                 if (runId === coverageRun) completed++;
@@ -500,11 +541,13 @@
             ": " + completed + " / " + bearings + " bearings checked (" +
             errors.length + " failed; " + multipointCount +
             " multipoint, " + legacyCount + " legacy, " +
-            endpointsRecovered + " endpoints recovered)");
+            endpointsRecovered + " endpoints recovered; " +
+            cacheHitCount + " cached; " + retryCount + " automatic retries)");
         }
         // If every request in the first chunk fails, continuing with nine
         // more expensive requests cannot produce a complete area estimate.
-        if (chunk === 0 && rays.slice(0, bearingsPerChunk).every(ray => !ray)) {
+        if (!cacheOnly && chunk === 0 &&
+            rays.slice(0, bearingsPerChunk).every(ray => !ray)) {
           stoppedEarly = true;
           break;
         }
@@ -593,7 +636,9 @@
             status: vis ? "complete" : "missing",
             queryMethod: radialMethods[i],
             samples: radialProfiles[i], visibility: vis,
-            error: failure ? failure.reason : null
+            error: failure ? failure.reason : null,
+            retryable: failure ? failure.retryable : false,
+            httpStatus: failure ? failure.httpStatus : null
           };
         }),
         cells
@@ -612,14 +657,25 @@
           "No reliable total area is reported. " +
           (legacyCount ? legacyCount + " successful radials used legacy polyline queries; " +
             "multipoint requires the staging Worker update. " : "") +
-          (examples ? " First errors: " + examples : ""), true);
+          (examples ? " First errors: " + examples : "") +
+          (retryCount ? " Automatic retries attempted: " + retryCount + "." : ""), true);
+        if (!cacheOnly && errors.some(error => error.retryable)) {
+          $("terrainRecoveryOption").hidden = false;
+          $("openTerrainRecovery").disabled = false;
+          status("terrainRecoveryStatus",
+            "Automatic retries finished. " + errors.filter(error => error.retryable).length +
+            " temporary failures remain; open the optional five-minute recovery window.");
+        }
       } else {
         $("terrainArea").textContent = fmt(mappedArea / (MI * MI), 0) + " mi²";
         status("terrainCoverageStatus", "Completed all 4 chunks: " + bearings + " bearings × " +
           samplesPerBearing + " terrain samples (plus " + endpointsRecovered +
           " verified endpoint repairs), " + rings + " distance rings. " +
           multipointCount + " multipoint / " + legacyCount + " legacy radial queries. Restricted to a smooth-Earth horizon (" +
-          fmt(radiusM / MI) + " mi). Buildings, diffraction and field strength are not modeled.");
+          fmt(radiusM / MI) + " mi). Buildings, diffraction and field strength are not modeled." +
+          (cacheHitCount ? " Cached profiles: " + cacheHitCount + "." : "") +
+          (retryCount ? " Automatic retries: " + retryCount + "." : "") +
+          (cacheOnly ? " Updated after the recovery window." : ""));
       }
     } catch (error) {
       if (runId === coverageRun)

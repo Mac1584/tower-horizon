@@ -11,6 +11,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
   <script src="script.js" defer></script>
   <script src="terrain.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" defer></script>
+  <script src="export.js" defer></script>
 </head>
 <body>
   <a class="wuw-skip" href="#calculator">Skip to calculator</a>
@@ -39,14 +42,17 @@
           <h2 class="wuw-panel-title" id="inputsTitle"><svg class="wuw-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6M16 14v6"/></svg>Inputs <span class="unit-tag">Heights in feet</span></h2>
           <div class="wuw-panel-content">
             <form id="towerForm" novalidate>
-              <label for="asrn">FCC Antenna Structure Registration Number (ASRN)</label>
-              <div class="lookup-row"><input id="asrn" name="asrn" type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" placeholder="1004233" aria-describedby="lookupHelp lookupStatus"><button id="asrnLookup" type="submit">Look Up FCC</button></div>
-              <p id="lookupHelp" class="hint">Try 1004233. Lookup uses an imported snapshot of FCC ASR registrations.</p>
-              <p id="lookupStatus" class="status" role="status" aria-live="polite">Enter an ASRN or use the manual inputs below.</p>
+              <label for="location">Location <span class="optional">coordinates, U.S. street address or ZIP</span></label>
+              <div class="lookup-row location-row"><input id="location" name="location" type="text" placeholder="42.29, -71.23 or 123 Main St, Boston, MA" aria-describedby="locationHelp locationStatus"><button id="locateInput" type="button">Locate</button></div>
+              <p id="locationHelp" class="hint">Coordinates are exact; street addresses are approximate Census geocodes; ZIP codes use an approximate geographic center. Confirm the location on the map before planning a radio path.</p>
+              <p id="locationStatus" class="status" role="status" aria-live="polite">Enter a location and select Locate, or use an FCC registration below.</p>
+              <div class="asrn-compact">
+                <label for="asrn">FCC antenna registration <span class="optional">(ASRN)</span></label>
+                <div class="lookup-row"><input id="asrn" name="asrn" type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" placeholder="1004233" aria-describedby="lookupHelp lookupStatus"><button id="asrnLookup" type="submit">Look Up FCC</button></div>
+                <p id="lookupHelp" class="hint">Optional, 7 digits; FCC record snapshot.</p>
+              </div>
+              <p id="lookupStatus" class="status" role="status" aria-live="polite">Enter an ASRN for an FCC lookup, or use manual inputs below.</p>
               <div class="divider"></div>
-              <label for="location">Location <span class="optional">ZIP or latitude, longitude</span></label>
-              <input id="location" name="location" type="text" placeholder="e.g. 02494 or 42.29, -71.23" aria-describedby="locationHelp">
-              <p id="locationHelp" class="hint">A reference label only; no geocoding, terrain, or population lookup is performed.</p>
               <div class="input-grid">
                 <div><label for="baseElevation">Base elevation <span class="optional">ft AMSL</span></label><input id="baseElevation" type="number" step="any" placeholder="Unknown" aria-describedby="baseHelp inputStatus"></div>
                 <div><label for="towerHeight">Registered tower height <span class="optional">ft AGL</span></label><input id="towerHeight" type="number" min="0" step="any" value="1201" aria-describedby="inputStatus"></div>
@@ -134,11 +140,22 @@
         <p>This calculation uses the USGS 3DEP ImageServer. Multipoint sampling requests 48 preselected geographic positions per radial in one query. Results can still take a minute or longer, depending on USGS response times.</p>
         <p><strong>Fastest uncached full scan: 12 USGS queries</strong> (12 bearings × 48 requested positions = 576 terrain positions), in four chunks of three. Full 24- or 36-bearing scans require 24 or 36 queries. Repeated scans may reuse cached results; missing data may need extra lookups. Until the staging Worker supports multipoint, the calculator uses its legacy polyline query method. Unverifiable terrain remains gray.</p>
       </div>
-      <div class="terrain-coverage-options"><div><label for="terrainBearings">Compass bearings</label><select id="terrainBearings"><option value="12">12 (fastest)</option><option value="24" selected>24 (standard)</option><option value="36">36 (detailed)</option></select></div><button id="analyzeCoverage" type="button">Calculate Terrain-Visible Area</button></div>
+      <div class="terrain-coverage-options"><div><label for="terrainBearings">Compass bearings</label><select id="terrainBearings"><option value="12">12 (fastest)</option><option value="24" selected>24 (standard)</option><option value="36">36 (detailed)</option></select></div><div><label for="terrainBasemap">Map background</label><select id="terrainBasemap"><option value="muted" selected>Muted grayscale (recommended)</option><option value="standard">Standard OpenStreetMap</option></select></div><button id="analyzeCoverage" type="button">Calculate Terrain-Visible Area</button></div>
       <p class="hint">Coarse approximation using 40 distance rings per bearing, bounded by the standard radio horizon (maximum 120 mi). This is not an FCC service contour. Unknown sample regions are shaded gray.</p>
       <div class="terrain-metrics"><div><span>Estimated terrain-visible area</span><strong id="terrainArea">—</strong></div></div>
       <p class="status" id="terrainCoverageStatus" role="status">Run the 360° analysis to update the map.</p>
-      <div id="terrainMap" aria-label="Map to select receiver and display estimated terrain-visibility results"></div>
+      <div id="terrainMap" class="terrain-map-muted" aria-label="Map to select receiver and display estimated terrain-visibility results"></div>
+      <div class="terrain-downloads" aria-label="Download terrain analysis">
+        <p class="terrain-download-title">EXPORT &amp; REPORTING <span class="optional">Current calculation / current map view</span></p>
+        <div class="terrain-download-actions">
+          <button type="button" id="exportCsv" class="secondary-button" disabled>CSV data</button>
+          <button type="button" id="exportKml" class="secondary-button" disabled>KML coverage</button>
+          <button type="button" id="exportJpeg" class="secondary-button">Map JPEG</button>
+          <button type="button" id="exportMapPdf" class="secondary-button">Map PDF</button>
+          <button type="button" id="exportReportPdf">One-page PDF report</button>
+        </div>
+        <p id="exportStatus" class="status" role="status" aria-live="polite">Run a terrain scan to enable CSV and KML exports. PDF reports identify any incomplete results.</p>
+      </div>
       <p class="hint">Map legend: <span class="legend green">Green = mostly terrain-clear</span> <span class="legend red">Red = mostly terrain-blocked</span> <span class="legend gray">Gray = incomplete terrain data</span> <span class="legend blue">Blue dashed = theoretical horizon</span>. Estimates reflect sampled paths and elevations only.</p>
     </div>
   </div>
@@ -147,7 +164,8 @@
       <h2 class="wuw-panel-title" id="methodTitle"><svg class="wuw-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18M6 16l4-8 4 5 5-9M3 4v15"/></svg>Method &amp; assumptions</h2>
       <div class="wuw-panel-content assumption-grid">
         <div><h3>Distance from both antenna heights</h3><p>Heights hₜ and hᵣ are in feet AGL; distances are in miles.</p><p class="formula">Radio: d ≈ 1.415 × (√hₜ + √hᵣ)<br>Geometric: d ≈ 1.225 × (√hₜ + √hᵣ)</p><p>The calculation uses √(2kRh) for each endpoint, R = 6,371 km, and k = 4/3 for a standard refracting atmosphere or k = 1 for geometric line of sight. Coefficients shown are rounded; calculations use the constants directly. See <a href="https://www.itu.int/dms_pub/itu-r/opb/rep/R-REP-P.2345-2015-PDF-E.pdf" target="_blank" rel="noopener noreferrer">ITU horizon geometry</a>.</p></div>
-        <div><h3>A useful first approximation</h3><p>Area = πd², a theoretical circle in square miles. Radiation center AMSL = base elevation AMSL + radiation center AGL.</p><p>Assumes a smooth Earth and similar ground elevations at both ends. These heights are not HAAT (height above average terrain). Base elevation is not added to the horizon height.</p><p>The 8 m antenna setback is a rough convenience estimate, not FCC antenna data. Enter the actual radiation center when known. ZIP or coordinates do not change the results. Population and density are reserved for a future data integration.</p></div>
+        <div><h3>A useful first approximation</h3><p>Area = πd², a theoretical circle in square miles. Radiation center AMSL = base elevation AMSL + radiation center AGL.</p><p>Assumes a smooth Earth and similar ground elevations at both ends. These heights are not HAAT (height above average terrain). Base elevation is not added to the horizon height.</p><p>The 8 m antenna setback is a rough convenience estimate, not FCC antenna data. Enter the actual radiation center when known. Geocoded addresses and ZIP centers are approximations, not surveyed tower sites. Population and density are reserved for a future data integration.</p></div>
+        <p class="method-aside"><strong>Engineering reality check:</strong> The Earth keeps curving, no matter how inconvenient that is for the spreadsheet. And a clear terrain path is still not a guarantee that the RF signal will cooperate.</p>
       </div>
     </section>
     <section class="wuw-panel sources" id="sources" aria-labelledby="sourcesTitle">

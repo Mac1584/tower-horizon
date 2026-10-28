@@ -386,11 +386,25 @@
 
       if (runId !== coverageRun) return;
       const missing = rays.filter(x => !x).length;
-      let mappedArea = 0;
+      let mappedArea = 0, unknownSectors = 0;
       for (let b = 0; b < bearings; b++) {
         const nextB = (b + 1) % bearings, a0 = b * 360 / bearings, a1 = (b + 1) * 360 / bearings;
+        // Both bounding radials must have valid terrain samples for a sector
+        // to be classified. Otherwise shade it gray, never red or green.
+        if (!rays[b] || !rays[nextB]) {
+          unknownSectors++;
+          if (visibilityLayer && map) {
+            const outerArc = Array.from({ length: 7 }, (_, step) =>
+              destination(tx, a0 + (a1 - a0) * step / 6, radiusM));
+            const coords = [[tx.lat, tx.lon], ...outerArc.map(p => [p.lat, p.lon])];
+            window.L.polygon(coords, {
+              color: "#727c86", weight: 1, opacity: 0.7, dashArray: "4 4",
+              fill: true, fillColor: "#949ba3", fillOpacity: 0.27, interactive: false
+            }).addTo(visibilityLayer);
+          }
+          continue;
+        }
         for (let ring = 0; ring < rings; ring++) {
-          if (!rays[b] || !rays[nextB]) continue;
           const count = [rays[b][ring], rays[b][ring + 1], rays[nextB][ring], rays[nextB][ring + 1]].filter(Boolean).length;
           const inner = radiusM * ring / rings, outer = radiusM * (ring + 1) / rings;
           mappedArea += ((count / 4) * Math.PI * (outer * outer - inner * inner) / bearings);
@@ -417,7 +431,8 @@
           ? "Stopped after the first chunk: all " + bearingsPerChunk + " tested bearings failed. "
           : missing + " of " + bearings + " terrain bearings failed across 4 chunks. ";
         status("terrainCoverageStatus", summary +
-          "Unknown areas remain unshaded; no reliable total area is reported." +
+          unknownSectors + " sectors are shaded gray because one or both boundary radials lack data. " +
+          "No reliable total area is reported." +
           (examples ? " First errors: " + examples : ""), true);
       } else {
         $("terrainArea").textContent = fmt(mappedArea / (MI * MI), 0) + " mi²";

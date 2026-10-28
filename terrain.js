@@ -336,7 +336,7 @@
     $("terrainArea").textContent = "Calculating...";
     const rays = Array(bearings).fill(null);
     const errors = [];
-    let completed = 0;
+    let completed = 0, stoppedEarly = false;
 
     try {
       // Complete four sequential chunks. Within each chunk, fetch at most
@@ -376,6 +376,12 @@
             ": " + completed + " / " + bearings + " bearings checked (" +
             errors.length + " failed)");
         }
+        // If every request in the first chunk fails, continuing with nine
+        // more expensive requests cannot produce a complete area estimate.
+        if (chunk === 0 && rays.slice(0, bearingsPerChunk).every(ray => !ray)) {
+          stoppedEarly = true;
+          break;
+        }
       }
 
       if (runId !== coverageRun) return;
@@ -407,8 +413,11 @@
       if (missing) {
         $("terrainArea").textContent = "Incomplete";
         const examples = errors.slice(0, 2).map(e => e.angle + "°: " + e.reason).join("; ");
-        status("terrainCoverageStatus", missing + " of " + bearings +
-          " terrain bearings failed in 4 chunks. Unknown areas remain unshaded; no reliable total area is reported." +
+        const summary = stoppedEarly
+          ? "Stopped after the first chunk: all " + bearingsPerChunk + " tested bearings failed. "
+          : missing + " of " + bearings + " terrain bearings failed across 4 chunks. ";
+        status("terrainCoverageStatus", summary +
+          "Unknown areas remain unshaded; no reliable total area is reported." +
           (examples ? " First errors: " + examples : ""), true);
       } else {
         $("terrainArea").textContent = fmt(mappedArea / (MI * MI), 0) + " mi²";

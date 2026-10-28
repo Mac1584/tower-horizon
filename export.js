@@ -123,6 +123,36 @@
     setStatus("KML downloaded: " + scan.cells.length +
       " classified cells. Unknown terrain is included in gray.");
   }
+  // Draw the exact coverage polygons independently of Leaflet's SVG renderer.
+  // This is used on top of a map-tile screenshot, and in schematic fallback.
+  function drawCoverageOverlay(ctx, canvas, map, scan) {
+    if (!scan) return;
+    const originalSize = map.getSize();
+    const sx = canvas.width / originalSize.x;
+    const sy = canvas.height / originalSize.y;
+    const toPx = p => {
+      const projected = map.latLngToContainerPoint([p.lat, p.lon]);
+      return { x: projected.x * sx, y: projected.y * sy };
+    };
+    for (const cell of scan.cells) {
+      const pts = cell.vertices.map(toPx);
+      ctx.beginPath();
+      pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+      ctx.closePath();
+      ctx.fillStyle = cell.status === "terrain_clear" ? "rgba(18,110,66,.60)" :
+        cell.status === "terrain_blocked" ? "rgba(170,45,48,.58)" : "rgba(98,107,117,.54)";
+      ctx.fill();
+    }
+    const tx = toPx(scan.tx);
+    const deltaLon = (scan.radiusM / 6371000) * (180 / Math.PI) /
+      Math.max(.01, Math.cos(scan.tx.lat * Math.PI / 180));
+    const east = toPx({ lat: scan.tx.lat, lon: scan.tx.lon + deltaLon });
+    ctx.save();
+    ctx.beginPath(); ctx.arc(tx.x, tx.y, Math.abs(east.x - tx.x), 0, Math.PI * 2);
+    ctx.strokeStyle = "#184c83"; ctx.lineWidth = Math.max(2, 3 * sx);
+    ctx.setLineDash([Math.max(4,7*sx), Math.max(3,5*sx)]); ctx.stroke();
+    ctx.restore();
+  }
   function mapVectorFallback(map) {
     const scan = coverage();
     const element = $("terrainMap");
@@ -186,10 +216,17 @@
         const canvas = await window.html2canvas(target, {
           useCORS: true, allowTaint: false, backgroundColor: "#edf1f3",
           scale: Math.min(2, window.devicePixelRatio || 2),
-          logging: false, imageTimeout: 9000
+          logging: false, imageTimeout: 9000,
+          onclone: clonedDocument => {
+            // Omit the SVG overlay in the screen capture. It will be precisely
+            // redrawn from verified scan geometry on the export canvas below.
+            const pane = clonedDocument.querySelector("#terrainMap .leaflet-overlay-pane");
+            if (pane) pane.style.opacity = "0";
+          }
         });
         if (canvas.width && canvas.height) {
           const ctx = canvas.getContext("2d");
+          drawCoverageOverlay(ctx, canvas, map, coverage());
           // Preserve attribution in exports even if the Leaflet control isn't captured.
           ctx.fillStyle = "rgba(255,255,255,.93)";
           ctx.fillRect(0,canvas.height-27,canvas.width,27);

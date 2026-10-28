@@ -10,6 +10,7 @@
   let map = null, towerMarker = null, receiverMarker = null, horizonCircle = null;
   let visibilityLayer = null, lastTxElevation = null, currentProfile = null, coverageRun = 0, analysisCounter = 0;
   let coverageSnapshot = null;
+  let recoverySession = null;
   const profileCache = new Map();
   const deg = (n) => n * RAD;
   const rad = (n) => n / RAD;
@@ -148,30 +149,20 @@
     profileCache.set(profileKey(tx, rx, n), completed);
     return { samples: completed, recovered: true };
   }
-  // Request explicit, equally spaced geographic samples for 360-degree radials.
-  // The staging Worker needs the /terrain/multipoint handler to activate this.
-  // Until deployed, a 404 uses the existing (legacy) polyline route.
-  async function getRadialProfile(tx, rx, n = 48) {
-    const key = "multipoint|" + profileKey(tx, rx, n);
-    if (profileCache.has(key)) return { samples: profileCache.get(key), method: "multipoint" };
-    let data;
-    try {
-      data = await fetchJSON(TOWER_API + "/terrain/multipoint", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tx, rx, samples: n })
-      }, 35000);
-    } catch (error) {
-      if (error.httpStatus !== 404 && error.httpStatus !== 405) throw error;
-      // Preserve the existing, verified single-path backend until the new
-      // route is deployed. Never claim that fallback is multipoint sampling.
-      return { samples: await getProfile(tx, rx, n), method: "polyline" };
-    }
-    if (data.sampleMethod !== "multipoint" || data.requestedCount !== n ||
+  // Only retry temporary network/service errors. Bad inputs and absent
+  // elevation measurements must remain unknown, not trigger repeated calls.
+  function isTransientTerrainError(error) {
+    const status = Number(error?.httpStatus);
+    return [408, 429, 500, 502, 503, 504].includes(status) ||
+      error?.name === "AbortError" || error?.name === "TimeoutError" ||
+      error instanceof TypeError;
+  }
+
+  function validateMultipoint(data, tx, rx, n) {
+    if (data?.sampleMethod !== "multipoint" || data.requestedCount !== n ||
         !Array.isArray(data.samples) || data.samples.length !== n)
       throw new Error("Invalid multipoint response from the terrain Worker");
-    const missing = [];
-    const total = distance(tx, rx);
+    const missing = [], total = distance(tx, rx);
     const samples = data.samples.map((entry, i) => {
       if (!entry || entry.index !== i || entry.value == null ||
           entry.value === "" || !Number.isFinite(Number(entry.value))) {
@@ -184,7 +175,8 @@
         return null;
       }
       const location = samplePoint(entry.location);
-      if (!validLatLon(location)) {
+      const expected = interpolate(tx, rx, i / (n - 1));
+      if (!validLatLon(location) || distance(location, expected) > 25) {
         missing.push(i);
         return null;
       }
@@ -194,12 +186,42 @@
       throw new Error("USGS has no valid elevation at " + missing.length + " of " + n +
         " requested points (indices: " + missing.slice(0, 6).join(", ") +
         (missing.length > 6 ? ", ..." : "") + ")");
-    // Preserve the exact receiver endpoint distance to avoid a floating-point
-    // mismatch at the final visibility ring.
     samples[samples.length - 1].d = total;
+    return samples;
+  }
+
+  function cacheMultipoint(tx, rx, n, data) {
+    const samples = validateMultipoint(data, tx, rx, n);
     if (profileCache.size > 100) profileCache.clear();
-    profileCache.set(key, samples);
-    return { samples, method: "multipoint" };
+    profileCache.set("multipoint|" + profileKey(tx, rx, n), samples);
+    return samples;
+  }
+
+  // Request explicit, equally spaced geographic samples for 360-degree radials.
+  // The staging Worker needs the /terrain/multipoint handler to activate this.
+  // Until deployed, a 404 uses the existing (legacy) polyline route.
+  async function getRadialProfile(tx, rx, n = 48, cacheOnly = false) {
+    const key = "multipoint|" + profileKey(tx, rx, n);
+    if (profileCache.has(key)) return { samples: profileCache.get(key), method: "multipoint" };
+    if (cacheOnly) {
+      const legacy = profileCache.get(profileKey(tx, rx, n));
+      if (legacy) return { samples: legacy, method: "polyline" };
+      throw new Error("Not available in the verified terrain cache");
+    }
+    let data;
+    try {
+      data = await fetchJSON(TOWER_API + "/terrain/multipoint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tx, rx, samples: n })
+      }, 35000);
+    } catch (error) {
+      if (error.httpStatus !== 404 && error.httpStatus !== 405) throw error;
+      // Only unavailable routes use the legacy polyline method; a temporary
+      // 502 must remain a retryable error rather than silently switching data.
+      return { samples: await getProfile(tx, rx, n), method: "polyline" };
+    }
+    return { samples: cacheMultipoint(tx, rx, n, data), method: "multipoint" };
   }
 
   function analyze(samples, txAgl, rxAgl, k) {

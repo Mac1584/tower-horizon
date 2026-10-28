@@ -130,6 +130,8 @@ async function lookupTower(event) {
       ? `${data.latitude}, ${data.longitude}` : "";
 
     byId("location").value = typeof data.location === "string" ? data.location : coordinates;
+    setLocationStatus(coordinates ? "FCC coordinates loaded from ASRN. Verify on the map before using for path analysis." :
+      "FCC record loaded without usable coordinates; enter a location manually.");
     towerHeight.value = String(height);
     radiationCenterEdited = false;
     radCenter.value = String(radiation ?? Math.max(0, height - ANTENNA_SETBACK_FEET));
@@ -157,6 +159,84 @@ async function lookupTower(event) {
   }
 }
 
+// Resolve an entered transmitter location without modifying the FCC tower data.
+// The Census service does not offer browser CORS; its published JSONP interface
+// allows a single U.S. street-address lookup without a new Cloudflare route.
+function setLocationStatus(message, error = false) {
+  const el = byId("locationStatus");
+  el.textContent = message;
+  el.classList.toggle("error", error);
+}
+
+function censusAddressJSONP(address) {
+  return new Promise((resolve, reject) => {
+    const name = "towerCensus_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+    const script = document.createElement("script");
+    let finished = false;
+    const finish = (err, data) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      script.remove();
+      delete window[name];
+      if (err) reject(err); else resolve(data);
+    };
+    window[name] = data => finish(null, data);
+    const url = new URL("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress");
+    url.search = new URLSearchParams({
+      address, benchmark: "Public_AR_Current",
+      format: "jsonp", callback: name
+    }).toString();
+    script.src = url.toString();
+    script.onerror = () => finish(new Error("Census geocoder could not be reached."));
+    const timer = setTimeout(() => finish(new Error("Census geocoder timed out.")), 15000);
+    document.head.append(script);
+  });
+}
+
+async function locateTransmitter() {
+  const raw = byId("location").value.trim();
+  const button = byId("locateInput");
+  if (!raw) return setLocationStatus("Enter coordinates, a full U.S. street address or a ZIP code.", true);
+  let geo, description;
+  button.disabled = true;
+  button.textContent = "Locating…";
+  setLocationStatus("Resolving transmitter location…");
+  try {
+    const m = raw.match(/^\s*([+-]?\d{1,2}(?:\.\d+)?)\s*,\s*([+-]?\d{1,3}(?:\.\d+)?)\s*$/);
+    if (m) {
+      geo = { lat: Number(m[1]), lon: Number(m[2]) };
+      description = "Coordinates used exactly as supplied.";
+    } else if (/^\d{5}(?:-\d{4})?$/.test(raw)) {
+      const response = await fetch("https://api.zippopotam.us/us/" + raw.slice(0, 5));
+      if (!response.ok) throw new Error("ZIP code not found. Enter coordinates instead.");
+      const data = await response.json();
+      const place = data.places?.[0];
+      geo = { lat: Number(place?.latitude), lon: Number(place?.longitude) };
+      description = "ZIP code geographic center (approximate, NOT a tower-site coordinate).";
+    } else {
+      if (!/^\d+\s+\S+/.test(raw))
+        throw new Error("For street addresses, include the street number, street name, city and state.");
+      const data = await censusAddressJSONP(raw);
+      const result = data?.result?.addressMatches?.[0];
+      if (!result) throw new Error("Census could not locate that address. Enter a complete U.S. address or coordinates.");
+      geo = { lat: Number(result.coordinates?.y), lon: Number(result.coordinates?.x) };
+      description = "Approximate Census address match: " + (result.matchedAddress || raw) + ".";
+    }
+    if (!Number.isFinite(geo?.lat) || !Number.isFinite(geo?.lon) ||
+      Math.abs(geo.lat) > 90 || Math.abs(geo.lon) > 180)
+      throw new Error("The location service returned invalid coordinates.");
+    window.dispatchEvent(new CustomEvent("towerCoordinatesLoaded", { detail: geo }));
+    setLocationStatus(description + " TX: " + geo.lat.toFixed(6) + ", " + geo.lon.toFixed(6) +
+      ". Review the map and run USGS elevation when ready.");
+  } catch (error) {
+    setLocationStatus(error.message || "Unable to resolve location. Try coordinates.", true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Locate";
+  }
+}
+
 // Listen for typing so results update immediately, with no Calculate button.
 towerHeight.addEventListener("input", () => {
   if (!radiationCenterEdited) estimateRadiationCenter();
@@ -171,4 +251,8 @@ byId("resetRadCenter").addEventListener("click", () => {
   update();
 });
 byId("towerForm").addEventListener("submit", lookupTower);
+byId("locateInput").addEventListener("click", locateTransmitter);
+byId("location").addEventListener("keydown", event => {
+  if (event.key === "Enter") { event.preventDefault(); locateTransmitter(); }
+});
 update(); // Populate results using the initial illustrative heights.

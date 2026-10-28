@@ -5,7 +5,8 @@
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
-  const MAX_MS = 5 * 60 * 1000, REQUEST_MS = 35000, REST_MS = 5000;
+  const MAX_MS = 5 * 60 * 1000, REQUEST_MS = 35000;
+  const BASE_REST_MS = 5000, MAX_REST_MS = 30000;
   const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
   let session = null, closed = false, activeAbort = null, clock = null;
   let stopReason = null;
@@ -119,6 +120,7 @@
     }
   }
   async function recover() {
+    let failedCycles = 0;
     while (!closed && session.pending.length && now() < session.deadline) {
       // Sequential, bounded requests avoid creating excessive load on USGS.
       const cycle = [...session.pending];
@@ -161,8 +163,14 @@
           await delay(Math.min(1000, session.deadline - now()));
       }
       if (closed || !session.pending.length || now() >= session.deadline) break;
-      announce("Pausing five seconds before retrying remaining transient failures…");
-      await delay(Math.min(REST_MS, session.deadline - now()));
+      // Exponential backoff limits upstream load during extended outages:
+      // roughly 5, 10, 20, then 30 seconds between repeated failure cycles.
+      const seconds = Math.min(MAX_REST_MS,
+        BASE_REST_MS * (2 ** Math.min(failedCycles++, 3)));
+      const jitterMs = Math.floor(Math.random() * 500);
+      announce("USGS is still unavailable. Pausing " +
+        Math.ceil(seconds / 1000) + " seconds before another attempt…");
+      await delay(Math.min(seconds + jitterMs, session.deadline - now()));
     }
     if (!closed) stop(now() >= session.deadline ? "timeout" :
       session.success.size === session.total ? "recovered" :

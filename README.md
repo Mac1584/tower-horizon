@@ -5,7 +5,7 @@
 
 [Live Version 1.9](https://mac1584.github.io/tower-horizon/) · [Version 2.0 draft pull request](https://github.com/Mac1584/tower-horizon/pull/1) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md)
 
-> **Development status:** Version 2.0 exists on the `feature/terrain-v2-usgs` branch. The existing production website and FCC Worker are not updated automatically. The Worker extension needs to be integrated into the original Worker source and validated before deployment. The transmitter elevation and single-path USGS calculations have been validated locally. The 360-degree scan is still beta; the new multipoint route must be installed and validated in the **staging** Worker before any production rollout.
+> **Development status:** Version 2.0 exists on the `feature/terrain-v2-usgs` branch. The existing production website and FCC Worker are not updated automatically. The Worker extension needs to be integrated into the original Worker source and validated before deployment. The transmitter elevation and single-path USGS calculations have been validated locally. The 360-degree scan is still beta. The multipoint endpoint has been deployed to the existing **staging** Worker and validated with a successful 12/12-bearing local run. Recovery-window features are implemented in the development branch but still need real-browser QA before any production rollout.
 
 ## Why this tool exists
 
@@ -44,6 +44,8 @@ The existing `/tower` FCC route must be preserved. The repository contains a new
 1. Enter a seven-digit FCC Antenna Structure Registration Number (example: `1004233`) and select **Look Up FCC**, or enter manual tower/receiver values.
 2. Check the registered tower height, estimated radiation center height, receiver height and base elevation.
 3. Read the standard radio horizon (`k = 4/3`), geometric horizon (`k = 1`), theoretical circular area, and antenna center AMSL.
+
+The Location input is now first and accepts decimal coordinates, complete U.S. street addresses or five-digit ZIP codes. An address or ZIP lookup is approximate; review the coordinates before treating them as a tower site. The FCC ASRN input sits below Location in a smaller panel.
 
 The existing eight-meter antenna setback is a convenience approximation, **not** the actual licensed radiation-center height. Use the actual transmitting antenna center AGL whenever available.
 
@@ -117,6 +119,8 @@ This map is deliberately coarse. Boundary sectors, narrow valleys, ridges, build
 | `script.js` | Existing smooth-Earth horizon math and FCC lookup; dispatches valid FCC coordinates |
 | `terrain.js` | USGS calls, address selection, path visibility, profile SVG chart, coarse 360-degree view and structured export snapshots |
 | `export.js` | CSV, KML, JPEG and PDF exports, including the US Letter one-page report |
+| `recovery.html` / `recovery.js` | Optional five-minute stand-alone same-origin retry window for transient terrain errors |
+| `docs/RABBITEARS_MAP_RESEARCH.md` | Public RabbitEars contour/Leaflet/SPLAT research notes for future map enhancements |
 | `style.css` | Calculator/terrain layouts, map and charts |
 | `waypoint.css` | Shared dark-navy and gray Waypoint Utility Web visual system |
 | `worker-terrain-extension.js` | **Integration module only**; adds USGS/Census routes to existing Worker |
@@ -126,6 +130,17 @@ This map is deliberately coarse. Boundary sectors, narrow valleys, ridges, build
 | `docs/diagrams/architecture.svg` | System architecture diagram |
 | `docs/diagrams/terrain-profile.svg` | Terrain line-of-sight diagram |
 | `docs/diagrams/coverage-map.svg` | 360-degree visibility map diagram |
+
+## Version 2.0 recovery and error handling (development branch)
+
+The 360-degree scan requests at most three USGS terrain profiles concurrently and splits an uncached 12-bearing scan into four chunks. All multipoint profiles have 48 explicitly requested coordinates.
+
+- Successful profiles are validated and cached in browser memory. Network/service errors are not cached.
+- A temporary HTTP **408, 429, 500, 502, 503, 504**, network failure, or timeout triggers at most **two automatic retries** with short delays. Missing or invalid elevation positions do **not** trigger automatic retries.
+- If transient errors remain after the two automatic retries, the completed scan shows an optional **Open 5-minute recovery window** button. It opens `recovery.html` only after a user click. The separate window retries **only the failed transient bearings**, **one request at a time**, for no longer than five minutes; closing or stopping it ends the session.
+- The popup sends results only to the original same-origin calculator and accepts configuration only from that window. The original page verifies returned coordinates and elevation values before caching them, then **recalculates the map from the cache without new USGS calls**.
+- Unknown terrain remains gray and total terrain-visible area stays **Incomplete** until every required radial is verified. The pop-up may be blocked by browser settings; in that case no new requests run.
+- Production workers and the existing selected-path analysis are not modified by these features.
 
 ## Version 2.0 UX and export features (development branch)
 

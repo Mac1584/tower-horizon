@@ -87,7 +87,7 @@ h3 { color: #193b58; font-size: 12px; margin: 0 0 7px; }
 .terrain-coverage-options>div{width:220px;max-width:100%}
 #terrainMap{height:400px;width:100%;background:#e2e9ec;border:1px solid #89949d}
 .legend{display:inline-block;margin:0 12px 4px 0;padding:2px 5px;border-left:5px solid}
-.legend.green{border-color:#3d985d}.legend.red{border-color:#c36a5c}.legend.gray{border-color:#949ba3}.legend.blue{border-color:#1f557f}
+.legend.green{border-color:#126e42}.legend.red{border-color:#aa2d30}.legend.gray{border-color:#626b75}.legend.blue{border-color:#184c83}
 @media(max-width:720px){.terrain-controls{grid-template-columns:minmax(0,1fr)}#terrainMap{height:310px}}
 
 /* Height control repeated in terrain panel; both fields are synchronized. */
@@ -100,3 +100,24 @@ h3 { color: #193b58; font-size: 12px; margin: 0 0 7px; }
 .terrain-processing-notice .terrain-processing-title{margin:0 0 7px;color:#193b58;font-size:11px;font-weight:700;letter-spacing:.06em}
 .terrain-processing-notice p{margin:0 0 7px;line-height:1.5}
 .terrain-processing-notice p:last-child{margin-bottom:0}
+
+/* V2.0 usability: location first, compact FCC lookup at right. */
+.location-row{align-items:stretch}
+.asrn-compact{box-sizing:border-box;width:min(100%,340px);margin:13px 0 5px auto;padding:10px 11px;background:#edf0f2;border:1px solid #89949d}
+.asrn-compact label{font-size:11px;margin-bottom:5px}
+.asrn-compact .lookup-row{gap:6px}
+.asrn-compact input{max-width:135px;min-height:34px;height:34px;padding:6px 8px;font-size:12px}
+.asrn-compact button{min-height:34px;height:34px;padding:6px 9px;font-size:11px}
+.asrn-compact .hint{margin:4px 0 0}
+@media(max-width:520px){.asrn-compact .lookup-row{flex-wrap:nowrap}.asrn-compact .lookup-row input{flex-basis:auto;flex-grow:1}.asrn-compact .lookup-row button{width:auto;white-space:nowrap}}
+
+/* Map backgrounds change only raster tiles, not antenna markers or the
+   coverage polygons. This avoids an additional paid basemap API. */
+.terrain-map-muted .leaflet-tile-pane{filter:grayscale(1) brightness(1.12) contrast(.82)}
+.terrain-map-muted{background:#f0f0f0}
+.terrain-downloads{margin:12px 0;padding:12px 13px;background:#e9edef;border:1px solid #89949d}
+.terrain-download-title{margin:0 0 9px;color:#193b58;font-weight:bold;font-size:11px;letter-spacing:.045em}
+.terrain-download-actions{display:flex;flex-wrap:wrap;gap:7px}
+.terrain-download-actions button{margin:0;min-height:34px;padding:7px 10px;white-space:nowrap}
+.terrain-downloads .status{margin:9px 0 0}
+.method-aside{margin:12px 0 0;padding:10px 12px;background:#f1f3f4;border-left:4px solid #b5a565;color:#52616b;font-size:11px;font-style:italic}

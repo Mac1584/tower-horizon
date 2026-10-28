@@ -311,6 +311,7 @@
     else $("terrainAMSL").textContent = "—";
   }
   function invalidateTerrain() {
+    stopTerrainRecovery("Inputs changed; recovery session cancelled.");
     currentProfile = null;
     coverageSnapshot = null;
     window.dispatchEvent(new Event("towerCoverageCleared"));
@@ -684,6 +685,119 @@
       if (runId === coverageRun) $("analyzeCoverage").disabled = false;
     }
   }
+  // The recovery window never invents elevations and cannot write directly
+  // to this document. Only validated messages from the specific child window
+  // in the current scan can update the shared verified terrain cache.
+  function stopTerrainRecovery(note = "") {
+    const old = recoverySession;
+    recoverySession = null;
+    if (old?.popup && !old.popup.closed) {
+      old.popup.postMessage({
+        type: "tower-terrain-recovery-cancel", token: old.token
+      }, window.location.origin);
+    }
+    $("terrainRecoveryOption").hidden = true;
+    $("openTerrainRecovery").disabled = false;
+    if (note) status("terrainRecoveryStatus", note);
+  }
+
+  function openTerrainRecovery() {
+    const scan = coverageSnapshot;
+    if (!scan || scan.complete || recoverySession) return;
+    const failed = scan.radialData.filter(radial =>
+      radial.status === "missing" && radial.retryable === true);
+    if (!failed.length) {
+      status("terrainRecoveryStatus", "No temporary errors are eligible for automatic recovery.");
+      return;
+    }
+    const token = (window.crypto?.randomUUID?.() ||
+      (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) +
+        "-" + Math.random().toString(36).slice(2)));
+    // This call must happen inside a user click. Browsers can block an
+    // unsolicited popup; nothing is attempted if permission is denied.
+    const popup = window.open("./recovery.html", "tower-recovery-" + token,
+      "popup,width=640,height=720,resizable=yes,scrollbars=yes");
+    if (!popup) {
+      status("terrainRecoveryStatus", "Your browser blocked the recovery window. Allow pop-ups for this site, then click again.", true);
+      return;
+    }
+    recoverySession = {
+      token, popup, runId: coverageRun, tx: { ...scan.tx },
+      samples: scan.samplesPerBearing,
+      bearings: failed.map(radial => ({
+        bearingDeg: radial.bearingDeg,
+        rx: destination(scan.tx, radial.bearingDeg, scan.radiusM)
+      })),
+      accepted: new Set(),
+      started: false
+    };
+    $("openTerrainRecovery").disabled = true;
+    status("terrainRecoveryStatus", "Recovery window opened. Keep this calculator open while it retries " +
+      failed.length + " temporarily failed bearing(s).");
+    popup.focus();
+  }
+
+  function onTerrainRecoveryMessage(event) {
+    const session = recoverySession;
+    if (!session || event.origin !== window.location.origin ||
+        event.source !== session.popup) return;
+    if (session.runId !== coverageRun) {
+      stopTerrainRecovery("The terrain inputs or scan changed. The previous recovery has been cancelled.");
+      return;
+    }
+    const data = event.data;
+    if (!data || typeof data !== "object") return;
+    if (data.type === "tower-terrain-recovery-ready") {
+      if (session.started) return;
+      session.started = true;
+      session.popup.postMessage({
+        type: "tower-terrain-recovery-start",
+        token: session.token,
+        workerUrl: TOWER_API,
+        tx: session.tx, samples: session.samples,
+        bearings: session.bearings,
+        maxDurationMs: 5 * 60 * 1000
+      }, event.origin);
+      return;
+    }
+    if (data.token !== session.token) return;
+    if (data.type === "tower-terrain-recovery-sample") {
+      const bearing = session.bearings.find(item => item.bearingDeg === data.bearingDeg);
+      if (!bearing || session.accepted.has(bearing.bearingDeg)) return;
+      try {
+        if (!validLatLon(data.tx) || !validLatLon(data.rx) ||
+            distance(data.tx, session.tx) > 1 ||
+            distance(data.rx, bearing.rx) > 1)
+          throw new Error("Unexpected coordinates in recovered terrain");
+        cacheMultipoint(session.tx, bearing.rx, session.samples, data.samples);
+        session.accepted.add(bearing.bearingDeg);
+        status("terrainRecoveryStatus",
+          "Recovery window verified " + session.accepted.size + " of " +
+          session.bearings.length + " previously failed bearings.");
+      } catch (error) {
+        console.warn("Rejected invalid popup recovery data", error);
+        status("terrainRecoveryStatus",
+          "A recovery response was rejected because its terrain data could not be verified.", true);
+      }
+    } else if (data.type === "tower-terrain-recovery-finished") {
+      const accepted = session.accepted.size;
+      recoverySession = null;
+      $("openTerrainRecovery").disabled = false;
+      $("terrainRecoveryOption").hidden = true;
+      if (accepted) {
+        // Recompute using only cached, validated profiles. This path must
+        // never make fresh calls to USGS or re-trigger automatic retries.
+        analyzeCoverage({ cacheOnly: true }).catch(error =>
+          status("terrainCoverageStatus",
+            "Recovery data loaded but map refresh failed: " + error.message, true));
+      } else {
+        status("terrainCoverageStatus",
+          "Five-minute recovery ended without verified new terrain data. " +
+          "Gray unknown sectors remain. You may run a new analysis later.", true);
+      }
+    }
+  }
+
   function initializeMap() {
     if (!window.L) {
       $("terrainMap").textContent = "Map tiles unavailable. Enter receiver coordinates manually. Terrain analysis remains available.";
@@ -713,7 +827,10 @@
     });
     $("geocodeReceiver").addEventListener("click", geocodeReceiver);
     $("analyzePath").addEventListener("click", analyzeSelectedPath);
-    $("analyzeCoverage").addEventListener("click", analyzeCoverage);
+    $("analyzeCoverage").addEventListener("click", () => analyzeCoverage());
+    $("openTerrainRecovery").addEventListener("click", openTerrainRecovery);
+    window.addEventListener("message", onTerrainRecoveryMessage);
+    window.addEventListener("pagehide", () => stopTerrainRecovery("Page closed."));
     $("terrainBasemap").addEventListener("change", () => {
       $("terrainMap").classList.toggle("terrain-map-muted", $("terrainBasemap").value === "muted");
     });

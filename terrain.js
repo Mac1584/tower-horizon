@@ -504,7 +504,9 @@
                   });
                 if (runId !== coverageRun) return;
                 if (wasCached) cacheHitCount++;
-                const repaired = radial.method === "multipoint"
+                // During a recovery refresh, use only profiles already
+                // verified in memory. Never issue new USGS/EPQS requests.
+                const repaired = radial.method === "multipoint" || cacheOnly
                   ? { samples: radial.samples, recovered: false }
                   : await recoverRadialEndpoint(radial.samples, tx, rx, samplesPerBearing);
                 if (runId !== coverageRun) return;

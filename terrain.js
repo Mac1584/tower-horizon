@@ -7,7 +7,7 @@
   const SAMPLES_API = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples";
   const TOWER_API = "https://tower-data-api.mac1584.workers.dev";
   const fmt = (n, d = 1) => Number.isFinite(n) ? n.toLocaleString("en-US", { maximumFractionDigits: d }) : "—";
-  let proxyAvailable = null, map = null, towerMarker = null, receiverMarker = null, horizonCircle = null;
+  let map = null, towerMarker = null, receiverMarker = null, horizonCircle = null;
   let visibilityLayer = null, lastTxElevation = null, currentProfile = null, coverageRun = 0, analysisCounter = 0;
   const profileCache = new Map();
   const deg = (n) => n * RAD;
@@ -43,22 +43,24 @@
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       const data = await response.json();
-      if (!response.ok || data.error) throw new Error((data.error && (data.error.message || data.error)) || "HTTP " + response.status);
+      if (!response.ok || data.error) {
+        const error = new Error((data.error && (data.error.message || data.error)) || "HTTP " + response.status);
+        error.httpStatus = response.status;
+        throw error;
+      }
       return data;
     } finally { clearTimeout(timer); }
   }
-  async function withProxy(relative, options, direct) {
-    if (proxyAvailable !== false) {
-      try {
-        const data = await fetchJSON(TOWER_API + relative, options, 12000);
-        proxyAvailable = true;
-        return data;
-      } catch (error) {
-        proxyAvailable = false;
-        console.info("Terrain extension not available on the FCC Worker; trying USGS directly.", error);
-      }
+  async function withProxy(relative, options, direct, timeoutMs = 12000) {
+    try {
+      return await fetchJSON(TOWER_API + relative, options, timeoutMs);
+    } catch (error) {
+      // A missing endpoint can use the public USGS fallback. Timeouts and
+      // temporary service errors must not disable the proxy for other rays.
+      if (error.httpStatus !== 404 && error.httpStatus !== 405) throw error;
+      console.info("Terrain route unavailable on Worker; trying USGS directly:", relative);
+      return direct();
     }
-    return direct();
   }
   async function queryElevation(p) {
     const qs = new URLSearchParams({ lat: String(p.lat), lon: String(p.lon) });
@@ -86,7 +88,7 @@
     }, () => fetchJSON(SAMPLES_API + "?" + new URLSearchParams({
       geometryType: "esriGeometryPolyline", geometry: geometryForLine(tx, rx),
       sampleCount: String(n), f: "json"
-    }), {}, 35000));
+    }), {}, 35000), 27000);
   }
   function samplePoint(location) {
     if (!location) return null;
@@ -213,6 +215,7 @@
   function invalidateTerrain() {
     currentProfile = null;
     coverageRun++;
+    $("analyzeCoverage").disabled = false;
     if (visibilityLayer) visibilityLayer.clearLayers();
     ["terrainResult", "pathClearance", "requiredHeight", "terrainArea"].forEach(id => $(id).textContent = "—");
     $("terrainChart").replaceChildren();
@@ -315,41 +318,73 @@
   async function analyzeCoverage() {
     const tx = point("terrainTxLat", "terrainTxLon");
     const txFt = Number($("radCenter").value), rxFt = Number($("receiverHeight").value), k = Number($("terrainK").value);
-    if (!validLatLon(tx) || !Number.isFinite(txFt) || !Number.isFinite(rxFt) || txFt < 0 || rxFt < 0)
-      return status("terrainCoverageStatus", "Enter valid coordinates and antenna heights.", true);
-    const bearings = Number($("terrainBearings").value), rings = 40;
+    if (!validLatLon(tx) || !Number.isFinite(txFt) || !Number.isFinite(rxFt) || txFt < 0 || rxFt < 0 || !Number.isFinite(k) || k <= 0)
+      return status("terrainCoverageStatus", "Enter valid coordinates, antenna heights and an Earth-radius factor.", true);
+    const bearings = Number($("terrainBearings").value), rings = 40, samplesPerBearing = 48;
+    const chunks = 4, maxConcurrent = 3;
+    if (!Number.isInteger(bearings) || bearings < 4 || bearings % chunks !== 0)
+      return status("terrainCoverageStatus", "Choose a compass-bearing count divisible into four equal chunks.", true);
+    const bearingsPerChunk = bearings / chunks;
     const endpoint = (hFeet) => Math.sqrt(2 * k * R * hFeet / FT);
     const radiusM = Math.min(120 * MI, endpoint(txFt) + endpoint(rxFt));
     if (!Number.isFinite(radiusM) || radiusM < 50)
       return status("terrainCoverageStatus", "Radio-horizon radius is too small for this sampling mode.", true);
+
     const runId = ++coverageRun;
     $("analyzeCoverage").disabled = true;
-    status("terrainCoverageStatus", "Fetching 360° terrain data: 0 / " + bearings + " bearings…");
     if (visibilityLayer) visibilityLayer.clearLayers();
+    $("terrainArea").textContent = "Calculating...";
     const rays = Array(bearings).fill(null);
-    let next = 0, finished = 0, failures = 0;
-    async function worker() {
-      while (next < bearings && runId === coverageRun) {
-        const i = next++, angle = 360 * i / bearings, rx = destination(tx, angle, radiusM);
-        try {
-          const p = await getProfile(tx, rx, 80);
-          if (runId !== coverageRun) return;
-          rays[i] = radialVisibility(p, rings, radiusM, txFt / FT, rxFt / FT, k);
-          if (!rays[i]) failures++;
-        } catch (e) { failures++; console.warn("Terrain bearing failed", i, e); }
-        finished++;
-        if (runId === coverageRun) status("terrainCoverageStatus", "Fetching terrain: " + finished + " / " + bearings + " bearings…");
-      }
-    }
+    const errors = [];
+    let completed = 0;
+
     try {
-      await Promise.all([worker(), worker(), worker()]);
+      // Complete four sequential chunks. Within each chunk, fetch at most
+      // three profiles at once to avoid flooding the USGS terrain service.
+      for (let chunk = 0; chunk < chunks; chunk++) {
+        if (runId !== coverageRun) return;
+        const start = chunk * bearingsPerChunk;
+        const end = start + bearingsPerChunk;
+        status("terrainCoverageStatus", "Chunk " + (chunk + 1) + " / " + chunks +
+          ": checking bearings " + (start + 1) + "–" + end + " of " + bearings + "…");
+        for (let offset = start; offset < end; offset += maxConcurrent) {
+          const tasks = Array.from({ length: Math.min(maxConcurrent, end - offset) }, (_, j) => {
+            const index = offset + j;
+            const angle = 360 * index / bearings;
+            return (async () => {
+              try {
+                const rx = destination(tx, angle, radiusM);
+                const profile = await getProfile(tx, rx, samplesPerBearing);
+                if (runId !== coverageRun) return;
+                const visibility = radialVisibility(profile, rings, radiusM, txFt / FT, rxFt / FT, k);
+                if (!visibility) throw new Error("Missing elevation samples at one or more distance rings");
+                rays[index] = visibility;
+              } catch (error) {
+                if (runId !== coverageRun) return;
+                const reason = error.name === "AbortError" ? "Worker request timed out" :
+                  String(error.message || error);
+                errors.push({ angle, reason });
+                console.warn("Terrain bearing " + angle + "° failed:", error);
+              } finally {
+                if (runId === coverageRun) completed++;
+              }
+            })();
+          });
+          await Promise.all(tasks);
+          if (runId !== coverageRun) return;
+          status("terrainCoverageStatus", "Chunk " + (chunk + 1) + " / " + chunks +
+            ": " + completed + " / " + bearings + " bearings checked (" +
+            errors.length + " failed)");
+        }
+      }
+
       if (runId !== coverageRun) return;
       const missing = rays.filter(x => !x).length;
-      let mappedArea = 0, rendered = 0, uncertain = 0;
+      let mappedArea = 0;
       for (let b = 0; b < bearings; b++) {
         const nextB = (b + 1) % bearings, a0 = b * 360 / bearings, a1 = (b + 1) * 360 / bearings;
         for (let ring = 0; ring < rings; ring++) {
-          if (!rays[b] || !rays[nextB]) { uncertain++; continue; }
+          if (!rays[b] || !rays[nextB]) continue;
           const count = [rays[b][ring], rays[b][ring + 1], rays[nextB][ring], rays[nextB][ring + 1]].filter(Boolean).length;
           const inner = radiusM * ring / rings, outer = radiusM * (ring + 1) / rings;
           mappedArea += ((count / 4) * Math.PI * (outer * outer - inner * inner) / bearings);
@@ -361,22 +396,32 @@
               fillOpacity: count >= 2 ? 0.31 : 0.22, interactive: false
             }).addTo(visibilityLayer);
           }
-          rendered++;
         }
       }
       if (horizonCircle && map) horizonCircle.setLatLng([tx.lat, tx.lon]).setRadius(radiusM);
-      else if (map) horizonCircle = window.L.circle([tx.lat, tx.lon], { radius: radiusM, color: "#1f557f", weight: 2, fill: false, dashArray: "7 5" }).addTo(map);
+      else if (map) horizonCircle = window.L.circle([tx.lat, tx.lon], {
+        radius: radiusM, color: "#1f557f", weight: 2, fill: false, dashArray: "7 5"
+      }).addTo(map);
       if (map) map.fitBounds(horizonCircle.getBounds(), { padding: [15, 15] });
+
       if (missing) {
         $("terrainArea").textContent = "Incomplete";
-        status("terrainCoverageStatus", missing + " of " + bearings + " terrain bearings failed. Unknown areas are intentionally unshaded. No reliable total area is reported.", true);
+        const examples = errors.slice(0, 2).map(e => e.angle + "°: " + e.reason).join("; ");
+        status("terrainCoverageStatus", missing + " of " + bearings +
+          " terrain bearings failed in 4 chunks. Unknown areas remain unshaded; no reliable total area is reported." +
+          (examples ? " First errors: " + examples : ""), true);
       } else {
         $("terrainArea").textContent = fmt(mappedArea / (MI * MI), 0) + " mi²";
-        status("terrainCoverageStatus", "Coarse terrain-visibility area estimated from " + bearings + " bearings × " +
-          rings + " distance rings. Restricted to the smooth-Earth radio-horizon radius (" + fmt(radiusM / MI) +
-          " mi). Terrain gaps, structures, diffraction and field strength are not modeled.");
+        status("terrainCoverageStatus", "Completed all 4 chunks: " + bearings + " bearings × " +
+          samplesPerBearing + " terrain samples, " + rings + " distance rings. Restricted to a smooth-Earth horizon (" +
+          fmt(radiusM / MI) + " mi). Buildings, diffraction and field strength are not modeled.");
       }
-    } finally { if (runId === coverageRun) $("analyzeCoverage").disabled = false; }
+    } catch (error) {
+      if (runId === coverageRun)
+        status("terrainCoverageStatus", "Coverage calculation stopped: " + (error.message || String(error)), true);
+    } finally {
+      if (runId === coverageRun) $("analyzeCoverage").disabled = false;
+    }
   }
   function initializeMap() {
     if (!window.L) {

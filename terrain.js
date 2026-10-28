@@ -118,13 +118,34 @@
       throw new Error("USGS returned large elevation gaps along this path.");
     return samples;
   }
+  function profileKey(tx, rx, n) {
+    return [tx.lat, tx.lon, rx.lat, rx.lon, n].map(v => Number(v).toFixed(5)).join("|");
+  }
   async function getProfile(tx, rx, n = 72) {
-    const cacheKey = [tx.lat, tx.lon, rx.lat, rx.lon, n].map(v => Number(v).toFixed(5)).join("|");
+    const cacheKey = profileKey(tx, rx, n);
     if (profileCache.has(cacheKey)) return profileCache.get(cacheKey);
     const p = normalizeSamples(await getRawProfile(tx, rx, n), tx, rx, n);
     if (profileCache.size > 80) profileCache.clear();
     profileCache.set(cacheKey, p);
     return p;
+  }
+  // USGS getSamples does not always include the exact receiver endpoint.
+  // Repair that specific gap with an independent USGS EPQS lookup; never
+  // extrapolate a missing elevation or assume unknown terrain is clear.
+  async function recoverRadialEndpoint(samples, tx, rx, n) {
+    const total = distance(tx, rx), last = samples[samples.length - 1];
+    const missingMeters = total - last.d;
+    if (missingMeters <= 1) return { samples, recovered: false };
+    const expectedSpacing = total / Math.max(1, n - 1);
+    if (missingMeters > expectedSpacing * 1.6)
+      throw new Error("Too much terrain missing near radial endpoint for safe recovery");
+    const elevation = await queryElevation(rx);
+    if (!Number.isFinite(elevation))
+      throw new Error("USGS could not verify the radial endpoint elevation");
+    const completed = [...samples.filter(s => s.d < total - 0.01),
+      { lat: rx.lat, lon: rx.lon, d: total, elev: elevation }];
+    profileCache.set(profileKey(tx, rx, n), completed);
+    return { samples: completed, recovered: true };
   }
   function analyze(samples, txAgl, rxAgl, k) {
     const D = samples[samples.length - 1].d;
@@ -336,7 +357,7 @@
     $("terrainArea").textContent = "Calculating...";
     const rays = Array(bearings).fill(null);
     const errors = [];
-    let completed = 0, stoppedEarly = false;
+    let completed = 0, stoppedEarly = false, endpointsRecovered = 0;
 
     try {
       // Complete four sequential chunks. Within each chunk, fetch at most
@@ -356,8 +377,11 @@
                 const rx = destination(tx, angle, radiusM);
                 const profile = await getProfile(tx, rx, samplesPerBearing);
                 if (runId !== coverageRun) return;
-                const visibility = radialVisibility(profile, rings, radiusM, txFt / FT, rxFt / FT, k);
-                if (!visibility) throw new Error("Missing elevation samples at one or more distance rings");
+                const repaired = await recoverRadialEndpoint(profile, tx, rx, samplesPerBearing);
+                if (runId !== coverageRun) return;
+                const visibility = radialVisibility(repaired.samples, rings, radiusM, txFt / FT, rxFt / FT, k);
+                if (!visibility) throw new Error("Missing elevation samples after endpoint verification");
+                if (repaired.recovered) endpointsRecovered++;
                 rays[index] = visibility;
               } catch (error) {
                 if (runId !== coverageRun) return;
@@ -374,7 +398,7 @@
           if (runId !== coverageRun) return;
           status("terrainCoverageStatus", "Chunk " + (chunk + 1) + " / " + chunks +
             ": " + completed + " / " + bearings + " bearings checked (" +
-            errors.length + " failed)");
+            errors.length + " failed; " + endpointsRecovered + " endpoints recovered)");
         }
         // If every request in the first chunk fails, continuing with nine
         // more expensive requests cannot produce a complete area estimate.
@@ -432,12 +456,14 @@
           : missing + " of " + bearings + " terrain bearings failed across 4 chunks. ";
         status("terrainCoverageStatus", summary +
           unknownSectors + " sectors are shaded gray because one or both boundary radials lack data. " +
+          endpointsRecovered + " radial endpoints were recovered with USGS EPQS. " +
           "No reliable total area is reported." +
           (examples ? " First errors: " + examples : ""), true);
       } else {
         $("terrainArea").textContent = fmt(mappedArea / (MI * MI), 0) + " mi²";
         status("terrainCoverageStatus", "Completed all 4 chunks: " + bearings + " bearings × " +
-          samplesPerBearing + " terrain samples, " + rings + " distance rings. Restricted to a smooth-Earth horizon (" +
+          samplesPerBearing + " terrain samples (plus " + endpointsRecovered +
+          " verified endpoint repairs), " + rings + " distance rings. Restricted to a smooth-Earth horizon (" +
           fmt(radiusM / MI) + " mi). Buildings, diffraction and field strength are not modeled.");
       }
     } catch (error) {

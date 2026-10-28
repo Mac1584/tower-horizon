@@ -5,7 +5,7 @@
 
 [Live Version 1.9](https://mac1584.github.io/tower-horizon/) · [Version 2.0 draft pull request](https://github.com/Mac1584/tower-horizon/pull/1) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md)
 
-> **Development status:** Version 2.0 exists on the `feature/terrain-v2-usgs` branch. The existing production website and FCC Worker are not updated automatically. The Worker extension needs to be integrated into the original Worker source and validated before deployment. End-to-end USGS calculations have **not yet been confirmed**.
+> **Development status:** Version 2.0 exists on the `feature/terrain-v2-usgs` branch. The existing production website and FCC Worker are not updated automatically. The Worker extension needs to be integrated into the original Worker source and validated before deployment. The transmitter elevation and single-path USGS calculations have been validated locally. The 360-degree scan is still beta; the new multipoint route must be installed and validated in the **staging** Worker before any production rollout.
 
 ## Why this tool exists
 
@@ -28,9 +28,9 @@ Tower Horizon Calculator 2.0 adds terrain elevation data to the existing broadca
 | Layer | Technology | Responsibility |
 |---|---|---|
 | Website | GitHub Pages, HTML/CSS/JavaScript | Inputs, original horizon calculator, visualization, results |
-| Backend | Cloudflare Worker `tower-data-api` | FCC lookup plus new USGS and Census proxy routes |
+| Backend | Cloudflare production `tower-data-api` and separate staging `tower-terrain-staging` | Keep FCC production stable while testing terrain routes |
 | Elevation | USGS Elevation Point Query Service (EPQS) | Ground elevation at a transmitter coordinate |
-| Profiles | USGS 3DEP ImageServer `getSamples` | Terrain elevation samples along a line |
+| Profiles | USGS 3DEP ImageServer `getSamples` | Existing polyline path lookups; new 48-point multipoint sampling for radial scans in staging |
 | Address lookup | U.S. Census Geocoder | Optional receiver street-address location |
 | Maps | Leaflet and OpenStreetMap tiles | Receiver selection and schematic viewshed overlay |
 | Analysis | JavaScript | Curvature-adjusted path, clearance, height and viewshed estimates |
@@ -101,8 +101,9 @@ A **negative sampled minimum clearance** indicates a modeled terrain obstruction
 4. The application retrieves radial terrain samples and classifies 40 distance rings along each bearing. It colors schematic cells based on neighboring ring/bearing visibility:
    - **Green:** predominantly terrain-visible samples.
    - **Red:** predominantly terrain-obstructed samples.
+   - **Gray:** missing or unverifiable terrain data.
    - **Blue dashed circle:** smooth-Earth radio-horizon limit.
-5. Examine the approximate terrain-visible area in square miles. If any required radial terrain data are missing, results should indicate **Incomplete** instead of reporting a definitive area estimate.
+5. Examine the approximate terrain-visible area in square miles. If any required radial terrain data are missing, results indicate **Incomplete** instead of reporting a definitive area estimate. The 12-bearing fastest mode uses four chunks of three radials, 48 sampling positions per radial; the [multipoint staging rollout](docs/MULTIPOINT_STAGING_ROLLOUT.md) is designed to fix all requested positions, including both endpoints.
 
 This map is deliberately coarse. Boundary sectors, narrow valleys, ridges, buildings, trees, field strength, antennas and propagation loss are not fully represented. Its area is **not** a regulatory signal-coverage contour, number of households served, or predicted audience.
 
@@ -118,6 +119,8 @@ This map is deliberately coarse. Boundary sectors, narrow valleys, ridges, build
 | `style.css` | Calculator/terrain layouts, map and charts |
 | `waypoint.css` | Shared dark-navy and gray Waypoint Utility Web visual system |
 | `worker-terrain-extension.js` | **Integration module only**; adds USGS/Census routes to existing Worker |
+| `cloudflare/staging-multipoint-handler.js` | New self-contained `/terrain/multipoint` route to append to the existing **staging** Worker |
+| `docs/MULTIPOINT_STAGING_ROLLOUT.md` | Safe, staged deployment and PowerShell verification of multipoint sampling |
 | `docs/CLOUDFLARE_SETUP_SOP.md` | Step-by-step setup, validation, staging, deployment and rollback |
 | `docs/diagrams/architecture.svg` | System architecture diagram |
 | `docs/diagrams/terrain-profile.svg` | Terrain line-of-sight diagram |
@@ -132,7 +135,7 @@ Download or check out the feature branch and open a local web server:
 ```powershell
 git clone --branch feature/terrain-v2-usgs https://github.com/Mac1584/tower-horizon.git
 cd tower-horizon
-python -m http.server 8000
+npx --yes serve . -l 8000
 ```
 
 Then visit `http://localhost:8000/`. The original numerical horizon calculator works locally. However, network-backed features require the FCC Worker and successful USGS/Census requests. The frontend attempts the new Worker routes first and may fall back to browser-direct public endpoints, which **can be blocked by CORS**.

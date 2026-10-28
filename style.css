@@ -94,3 +94,9 @@ h3 { color: #193b58; font-size: 12px; margin: 0 0 7px; }
 .terrain-height-link{margin:12px 0;padding:12px;background:#fff;border:1px solid #89949d;border-left:4px solid #356641}
 .terrain-height-link input{max-width:230px}
 .terrain-height-link .hint{margin-bottom:0}
+
+/* USGS processing-time notice, consistent with the Utility Web control-panel style. */
+.terrain-processing-notice{margin:12px 0 15px;padding:11px 13px;background:#fff8df;border:1px solid #b5a565;border-left:4px solid #b59a36;color:#25323a}
+.terrain-processing-notice .terrain-processing-title{margin:0 0 7px;color:#193b58;font-size:11px;font-weight:700;letter-spacing:.06em}
+.terrain-processing-notice p{margin:0 0 7px;line-height:1.5}
+.terrain-processing-notice p:last-child{margin-bottom:0}

@@ -295,6 +295,7 @@
     coverageRun++;
     $("analyzeCoverage").disabled = false;
     if (visibilityLayer) visibilityLayer.clearLayers();
+    if (horizonCircle && map) { map.removeLayer(horizonCircle); horizonCircle = null; }
     ["terrainResult", "pathClearance", "requiredHeight", "terrainArea"].forEach(id => $(id).textContent = "—");
     $("terrainChart").replaceChildren();
     status("terrainPathStatus", "Inputs changed. Run a new path analysis.");
@@ -316,10 +317,12 @@
     status("terrainPathStatus", "Geocoding address with the U.S. Census Bureau…");
     $("geocodeReceiver").disabled = true;
     try {
-      const data = await withProxy("/terrain/geocode?" + new URLSearchParams({ address }), {}, () =>
-        fetchJSON("https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?" +
-          new URLSearchParams({ address, benchmark: "Public_AR_Current", vintage: "Current_Current", format: "json" }), {}, 28000)
-      );
+      const data = await withProxy("/terrain/geocode?" + new URLSearchParams({ address }), {},
+        () => {
+          if (!window.towerCensusGeocode)
+            throw new Error("Address lookup is unavailable. Enter receiver coordinates manually.");
+          return window.towerCensusGeocode(address);
+        });
       const match = data.result?.addressMatches?.[0] || data;
       const coords = match.coordinates || { x: match.lon, y: match.lat };
       if (!Number.isFinite(Number(coords.x)) || !Number.isFinite(Number(coords.y))) throw new Error("No matching Census address was found.");

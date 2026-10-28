@@ -407,6 +407,17 @@
     $("geocodeReceiver").addEventListener("click", geocodeReceiver);
     $("analyzePath").addEventListener("click", analyzeSelectedPath);
     $("analyzeCoverage").addEventListener("click", analyzeCoverage);
+    // Mirror receiver height between the original calculator and terrain panel.
+    const terrainHeight = $("terrainReceiverHeight");
+    const mainHeight = $("receiverHeight");
+    terrainHeight.value = mainHeight.value;
+    terrainHeight.addEventListener("input", () => {
+      mainHeight.value = terrainHeight.value;
+      mainHeight.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    mainHeight.addEventListener("input", () => {
+      terrainHeight.value = mainHeight.value;
+    });
     $("radCenter").addEventListener("input", invalidateTerrain);
     $("towerHeight").addEventListener("input", invalidateTerrain);
     $("receiverHeight").addEventListener("input", invalidateTerrain);

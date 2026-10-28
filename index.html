@@ -130,11 +130,11 @@
     <h3>Elevation cross-section</h3><div class="terrain-chart-wrap"><svg id="terrainChart" viewBox="0 0 900 295" role="img" aria-label="Terrain profile; run a path analysis to populate" preserveAspectRatio="xMidYMid meet"></svg></div>
     <div class="terrain-subpanel terrain-coverage"><h3>3. 360° terrain-visibility map</h3>
       <div class="terrain-coverage-options"><div><label for="terrainBearings">Compass bearings</label><select id="terrainBearings"><option value="12">12 (fastest)</option><option value="24" selected>24 (standard)</option><option value="36">36 (detailed)</option></select></div><button id="analyzeCoverage" type="button">Calculate Terrain-Visible Area</button></div>
-      <p class="hint">Coarse approximation using 40 distance rings per bearing, bounded by the standard radio horizon (maximum 120 mi). This is not an FCC service contour. Unknown sample regions remain unshaded.</p>
+      <p class="hint">Coarse approximation using 40 distance rings per bearing, bounded by the standard radio horizon (maximum 120 mi). This is not an FCC service contour. Unknown sample regions are shaded gray.</p>
       <div class="terrain-metrics"><div><span>Estimated terrain-visible area</span><strong id="terrainArea">—</strong></div></div>
       <p class="status" id="terrainCoverageStatus" role="status">Run the 360° analysis to update the map.</p>
       <div id="terrainMap" aria-label="Map to select receiver and display estimated terrain-visibility results"></div>
-      <p class="hint">Map legend: <span class="legend green">Green = mostly terrain-clear</span> <span class="legend red">Red = mostly terrain-blocked</span> <span class="legend blue">Blue dashed = theoretical horizon</span>. Estimates reflect sampled paths and elevations only.</p>
+      <p class="hint">Map legend: <span class="legend green">Green = mostly terrain-clear</span> <span class="legend red">Red = mostly terrain-blocked</span> <span class="legend gray">Gray = incomplete terrain data</span> <span class="legend blue">Blue dashed = theoretical horizon</span>. Estimates reflect sampled paths and elevations only.</p>
     </div>
   </div>
 </section>

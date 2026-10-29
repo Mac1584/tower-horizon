@@ -11,6 +11,14 @@
     n.toLocaleString("en-US",{maximumFractionDigits:places}) : "N/A";
   const clean = value => String(value ?? "").replace(/[\u2013\u2014]/g,"-")
     .replace(/[^\x20-\x7e]/g,"");
+  function fitLine(doc,text,maxPt=550) {
+    const original=clean(text);
+    if(doc.getTextWidth(original)<=maxPt)return original;
+    let part=original;
+    while(part.length>12 && doc.getTextWidth(part+"...")>maxPt)
+      part=part.slice(0,-1);
+    return part+"...";
+  }
   const status = (message,error=false) => {
     const el = $("exportStatus");
     if(el) {el.textContent=message;el.classList.toggle("error",error);}
@@ -215,6 +223,8 @@
       else throw new Error("PDF library unavailable. Reload the calculator and try again.");
     }
     status("Preparing point-to-point report and 30-degree map...");
+    const sources=await window.TowerHorizonTerrainSources?.describe(path.data)
+      .catch(error=>{console.warn("USGS source metadata unavailable",error);return null;});
     const map=await capturePathMap(path);
     if(path!==pathData())throw new Error("The path inputs changed during export. Analyze the new path.");
     const doc=new window.jspdf.jsPDF({orientation:"portrait",unit:"pt",format:"letter",compress:true});
@@ -266,11 +276,15 @@
       "Approx. added height: A "+fmt(path.requiredTx*FT,0)+
       " ft OR B "+fmt(path.requiredRx*FT,0)+" ft (independent options).";
     doc.text(clean(extra),30,729);
-    doc.setFontSize(7.4);doc.setTextColor(96,108,116);
-    doc.text("Two-way geometric path is reciprocal. Duplex reliability, radio link budget, Fresnel-zone",30,749);
-    doc.text("clearance, foliage, buildings, diffraction and interference are NOT modeled.",30,760);
-    doc.text("The 30-degree map sector indicates orientation only; it is NOT modeled coverage or beamwidth.",30,771);
-    doc.setDrawColor(188,199,208);doc.line(30,778,582,778);
+    doc.setTextColor(35,67,84);doc.setFont("helvetica","normal");doc.setFontSize(7.6);
+    doc.text(fitLine(doc,"USGS DEM raster resolution: "+
+      (sources?.resolutionText || "Not reported by source")),30,741);
+    doc.text(fitLine(doc,"USGS source projects: "+
+      (sources?.projectText || "Not reported by source")),30,752);
+    doc.setFontSize(7.2);doc.setTextColor(96,108,116);
+    doc.text("Bare-earth geometry only; excludes Fresnel zone, foliage, buildings, interference and RF link budget.",30,765);
+    doc.text("30-degree sector is orientation only, not coverage. Geometric clearance is not duplex reliability.",30,776);
+    doc.setDrawColor(188,199,208);doc.line(30,781,582,781);
     doc.setFontSize(7.5);doc.text("USGS 3DEP  /  OpenStreetMap contributors  /  BETA  /  1 OF 1",30,788);
     const id=String($("asrn")?.value||"").replace(/\D/g,"").slice(0,7)||"manual";
     doc.save("tower-horizon-"+id+"-"+new Date().toISOString().slice(0,10)+"-point-to-point.pdf");

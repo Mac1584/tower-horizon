@@ -565,8 +565,14 @@
                 else legacyCount++;
                 if (repaired.recovered) endpointsRecovered++;
                 rays[index] = visibility;
+                // Preserve verified DEM provenance across the 360-degree
+                // scan snapshot. Elevation and clearance remain unchanged.
+                // Do not conflate sampled raster resolution with spacing.
                 radialProfiles[index] = repaired.samples.map(p => ({
-                  lat: p.lat, lon: p.lon, distanceM: p.d, elevationM: p.elev
+                  lat: p.lat, lon: p.lon, distanceM: p.d, elevationM: p.elev,
+                  rasterId: p.rasterId ?? null,
+                  resolution: p.resolution ?? null,
+                  sourceDetails: p.sourceDetails ?? null
                 }));
                 radialMethods[index] = radial.method;
               } catch (error) {

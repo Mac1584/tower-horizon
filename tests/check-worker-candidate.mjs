@@ -16,14 +16,28 @@ const mockFetch = async (input) => {
   mockCalls.push(u.toString());
   if (u.hostname === "epqs.nationalmap.gov")
     return Response.json({value:57.56});
+  if (u.pathname.endsWith("/ImageServer/query")) {
+    assert.equal(u.searchParams.get("returnGeometry"),"false");
+    assert(u.searchParams.get("objectIds").split(",").includes("88413"));
+    return Response.json({features:[{attributes:{
+      OBJECTID:88413,Name:"MA_CentralEastern_2021_B21",
+      ProductName:"USGS_3DEP",Source:"USGS",
+      AcquisitionDate:1622505600000,DEM_Type:1
+    }}]});
+  }
   assert(u.pathname.endsWith("/ImageServer/getSamples"), "Unexpected upstream route");
   const geometry = JSON.parse(u.searchParams.get("geometry"));
   if (u.searchParams.get("geometryType") === "esriGeometryMultipoint") {
     if (upstreamError)
       return Response.json({error:"USGS temporarily unavailable"},{status:502});
+    assert(u.searchParams.get("outFields")?.includes("Name"),
+      "USGS provenance attributes must be requested");
     const points = missingLastPoint ? geometry.points.slice(0,-1) : geometry.points;
     const samples = points.map(([x,y],index) => ({
       locationId:index, value:60 + index / 10,
+      rasterId:88413,resolution:1,
+      attributes:{Name:"MA_CentralEastern_2021_B21",
+        ProductName:"USGS_3DEP",Source:"USGS"},
       location:{x,y,spatialReference:{wkid:4326}}
     })).reverse();
     return Response.json({samples});
@@ -133,6 +147,9 @@ const multi=(await probe("USGS 48-point multipoint","/terrain/multipoint","POST"
 assert.equal(multi.samples.length,48);
 assert.equal(multi.samples[0].location.x,pair.tx.lon);
 assert.equal(multi.samples[47].location.x,pair.rx.lon);
+assert.equal(multi.samples[0].rasterId,88413);
+assert.equal(multi.samples[0].resolution,1);
+assert.equal(multi.samples[0].sourceDetails.name,"MA_CentralEastern_2021_B21");
 missingLastPoint=true;
 const partial=(await probe("USGS missing sample stays unknown","/terrain/multipoint","POST",
   pair,200,{returnedCount:47,complete:false})).result;
@@ -142,6 +159,15 @@ await probe("USGS upstream HTTP 502 propagated","/terrain/multipoint","POST",pai
 upstreamError=false;
 await probe("USGS invalid sample request","/terrain/multipoint","POST",
   {...pair,samples:200},400);
+const catalog=(await probe("USGS source catalog lookup",
+  "/terrain/catalog?ids=88413","GET",undefined,200,
+  {source:"USGS 3DEP ImageServer raster catalog"})).result;
+assert.equal(catalog.records["88413"].name,"MA_CentralEastern_2021_B21");
+assert.equal(catalog.records["88413"].demTypeCode,1);
+await probe("USGS source catalog rejects untrusted IDs",
+  "/terrain/catalog?ids=88413,xx","GET",undefined,400);
+await probe("USGS source catalog rejects POST",
+  "/terrain/catalog?ids=88413","POST",pair,405);
 await probe("USGS unknown route","/terrain/unknown","GET",undefined,404,
   {error:"Endpoint not found"});
 assert(preparedSQL.length>=3,"D1 lookup must be exercised");

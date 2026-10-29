@@ -263,15 +263,16 @@
     profile(doc,path);
     doc.setDrawColor(184,193,201);doc.line(30,674,582,674);
     doc.setTextColor(25,59,88);doc.setFont("helvetica","bold");doc.setFontSize(8.5);
-    doc.text("LINK DETAILS",30,689);
+    doc.text("LINK DETAILS / USGS TERRAIN SOURCES",30,689);
     doc.setTextColor(65,83,94);doc.setFont("helvetica","normal");doc.setFontSize(8.1);
     doc.text(clean("A to B bearing: "+fmt(map.sector.az,1)+
       " deg true   |   B to A bearing: "+fmt(map.sector.reverse,1)+
       " deg true   |   k = "+fmt(path.k,3)),30,703);
     const worst=path.worst?.d;
     const worstText=Number.isFinite(worst)?fmt(worst/MI,2)+" mi from A":"not available";
-    doc.text(clean("Lowest sampled clearance: "+worstText+
-      "   |   "+path.data.length+" verified terrain samples"),30,716);
+    doc.text(clean("Lowest clearance: "+worstText+
+      "   |   "+path.data.length+" verified samples, ~"+
+      fmt(path.distanceM*FT/Math.max(1,path.data.length-1),0)+" ft apart"),30,716);
     const extra=path.clear?"No additional height required for sampled geometric clearance.":
       "Approx. added height: A "+fmt(path.requiredTx*FT,0)+
       " ft OR B "+fmt(path.requiredRx*FT,0)+" ft (independent options).";

@@ -127,123 +127,166 @@
     setStatus("KML downloaded: " + scan.cells.length +
       " classified cells. Unknown terrain is included in gray.");
   }
-  // Draw the exact coverage polygons independently of Leaflet's SVG renderer.
-  // This is used on top of a map-tile screenshot, and in schematic fallback.
+  // Draw verified coverage directly from the scan, never by screenshotting
+  // Leaflet's SVG layer. We use a FRESH canvas because html2canvas can leave
+  // a transformed/filtered/clipped 2D context after painting its tiles. Drawing
+  // on that original context can put all polygons outside the image.
   function drawCoverageOverlay(ctx, canvas, map, scan) {
-    if (!scan) return;
+    if (!scan?.cells?.length) return 0;
     const originalSize = map.getSize();
+    if (!(originalSize.x > 0 && originalSize.y > 0))
+      throw new Error("Cannot project coverage while the map has no visible size.");
     const sx = canvas.width / originalSize.x;
     const sy = canvas.height / originalSize.y;
     const toPx = p => {
-      const projected = map.latLngToContainerPoint([p.lat, p.lon]);
-      return { x: projected.x * sx, y: projected.y * sy };
+      const pixel = map.latLngToContainerPoint([p.lat, p.lon]);
+      return { x: pixel.x * sx, y: pixel.y * sy };
     };
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.filter = "none";
+    ctx.beginPath();
+    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.clip();
+    let drawn = 0;
     for (const cell of scan.cells) {
+      if (!Array.isArray(cell.vertices) || cell.vertices.length < 3) continue;
       const pts = cell.vertices.map(toPx);
+      if (pts.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) continue;
+      // Only draw cells intersecting the current map view; leave other cells
+      // untouched. A completed scan can legitimately be panned offscreen.
+      if (pts.every(p => p.x < 0) || pts.every(p => p.y < 0) ||
+          pts.every(p => p.x > canvas.width) ||
+          pts.every(p => p.y > canvas.height)) continue;
       ctx.beginPath();
       pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
       ctx.closePath();
-      ctx.fillStyle = cell.status === "terrain_clear" ? "rgba(18,110,66,.60)" :
-        cell.status === "terrain_blocked" ? "rgba(170,45,48,.58)" : "rgba(98,107,117,.54)";
+      ctx.fillStyle = cell.status === "terrain_clear" ? "rgba(18,110,66,.67)" :
+        cell.status === "terrain_blocked" ? "rgba(170,45,48,.65)" :
+        "rgba(98,107,117,.60)";
       ctx.fill();
+      drawn++;
     }
     const tx = toPx(scan.tx);
     const deltaLon = (scan.radiusM / 6371000) * (180 / Math.PI) /
       Math.max(.01, Math.cos(scan.tx.lat * Math.PI / 180));
     const east = toPx({ lat: scan.tx.lat, lon: scan.tx.lon + deltaLon });
-    ctx.save();
-    ctx.beginPath(); ctx.arc(tx.x, tx.y, Math.abs(east.x - tx.x), 0, Math.PI * 2);
-    ctx.strokeStyle = "#184c83"; ctx.lineWidth = Math.max(2, 3 * sx);
-    ctx.setLineDash([Math.max(4,7*sx), Math.max(3,5*sx)]); ctx.stroke();
+    const radiusPx = Math.abs(east.x - tx.x);
+    if (Number.isFinite(radiusPx) && radiusPx > 0 &&
+        Number.isFinite(tx.x) && Number.isFinite(tx.y)) {
+      ctx.beginPath();
+      ctx.arc(tx.x, tx.y, radiusPx, 0, Math.PI * 2);
+      ctx.strokeStyle = "#184c83";
+      ctx.lineWidth = Math.max(2.5, 2.8 * sx);
+      ctx.setLineDash([Math.max(4, 7 * sx), Math.max(3, 5 * sx)]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // The original Leaflet markers may have been covered by the solid terrain
+    // cells, so redraw clear, print-friendly TX and RX symbols on top.
+    function dot(point, label, fill, radius) {
+      if (!Number.isFinite(point.x) || !Number.isFinite(point.y) ||
+          point.x < -20 || point.y < -20 ||
+          point.x > canvas.width + 20 || point.y > canvas.height + 20) return;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = Math.max(2, sx * 2);
+      ctx.stroke();
+      ctx.font = "bold " + Math.max(13, Math.round(12 * sx)) + "px Arial, sans-serif";
+      ctx.fillStyle = "#142e42";
+      ctx.fillText(label, point.x + radius + 5, point.y - radius - 2);
+    }
+    dot(tx, "TX", "#193b58", Math.max(5, 5 * sx));
+    const rxLat = Number(val("terrainRxLat")), rxLon = Number(val("terrainRxLon"));
+    if (Number.isFinite(rxLat) && Number.isFinite(rxLon))
+      dot(toPx({lat:rxLat,lon:rxLon}), "RX", "#b58c28", Math.max(4, 4 * sx));
     ctx.restore();
+    return drawn;
   }
+
   function mapVectorFallback(map) {
     const scan = coverage();
     const element = $("terrainMap");
     const canvas = document.createElement("canvas");
-    const width = 1200, height = Math.max(620, Math.round(width * element.clientHeight / Math.max(1, element.clientWidth)));
-    canvas.width = width; canvas.height = height;
+    const width = 1200;
+    const height = Math.max(620, Math.round(width * element.clientHeight /
+      Math.max(1, element.clientWidth)));
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
-    const originalSize = map.getSize();
-    const sx = width / originalSize.x, sy = height / originalSize.y;
-    ctx.fillStyle = "#eff2f3"; ctx.fillRect(0, 0, width, height);
-    ctx.strokeStyle = "#d5dce0"; ctx.lineWidth = 1;
-    for (let x = 0; x < width; x += 60) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,height); ctx.stroke(); }
-    for (let y = 0; y < height; y += 60) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(width,y); ctx.stroke(); }
-    const toPixel = p => {
-      const pt = map.latLngToContainerPoint([p.lat, p.lon]);
-      return {x: pt.x * sx, y: pt.y * sy};
-    };
-    if (scan) {
-      for (const cell of scan.cells) {
-        const points = cell.vertices.map(toPixel);
-        ctx.beginPath();
-        points.forEach((p,i) => i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y));
-        ctx.closePath();
-        ctx.fillStyle = cell.status === "terrain_clear" ? "rgba(18,110,66,.60)" :
-          cell.status === "terrain_blocked" ? "rgba(170,45,48,.58)" : "rgba(98,107,117,.54)";
-        ctx.fill();
-      }
-      const tx = toPixel(scan.tx);
-      const deltaLon = (scan.radiusM / 6371000) * (180 / Math.PI) /
-        Math.max(.01, Math.cos(scan.tx.lat * Math.PI / 180));
-      const east = toPixel({ lat: scan.tx.lat, lon: scan.tx.lon + deltaLon });
-      ctx.save();
-      ctx.beginPath(); ctx.arc(tx.x, tx.y, Math.abs(east.x-tx.x), 0, 2*Math.PI);
-      ctx.strokeStyle = "#184c83"; ctx.lineWidth = 4; ctx.setLineDash([12,9]); ctx.stroke();
-      ctx.restore();
+    if (!ctx) throw new Error("Could not create a printable terrain map.");
+    ctx.fillStyle = "#eff2f3";
+    ctx.fillRect(0, 0, width, height);
+    ctx.strokeStyle = "#d5dce0";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < width; x += 60) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
     }
-    const transmitter = toPixel(scan?.tx || {
-      lat: Number(val("terrainTxLat")), lon: Number(val("terrainTxLon"))
-    });
-    ctx.beginPath(); ctx.arc(transmitter.x,transmitter.y,9,0,Math.PI*2);
-    ctx.fillStyle="#193b58"; ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=3; ctx.stroke();
-    ctx.fillStyle="#193b58"; ctx.font="bold 18px Arial";
-    ctx.fillText("TRANSMITTER", Math.min(width-180,transmitter.x+14), Math.max(28,transmitter.y-10));
-    const receiver = toPixel({lat:Number(val("terrainRxLat")),lon:Number(val("terrainRxLon"))});
-    ctx.beginPath(); ctx.arc(receiver.x,receiver.y,7,0,Math.PI*2);
-    ctx.fillStyle="#193b58";ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
-    ctx.fillStyle="#193b58";ctx.font="15px Arial";
-    ctx.fillText("RECEIVER",Math.min(width-120,receiver.x+12),Math.max(30,receiver.y-8));
-    ctx.fillStyle="#ffffff"; ctx.fillRect(0,height-40,width,40);
-    ctx.font="15px Arial"; ctx.fillStyle="#52616b";
-    ctx.fillText("Schematic overlay only - base-map tiles unavailable in this export | Terrain: USGS 3DEP",18,height-15);
+    for (let y = 0; y < height; y += 60) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+    }
+    drawCoverageOverlay(ctx, canvas, map, scan);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, height - 42, width, 42);
+    ctx.fillStyle = "#52616b";
+    ctx.font = "15px Arial";
+    ctx.fillText("Schematic background: map tiles unavailable | Terrain: USGS 3DEP", 18, height - 15);
     return canvas;
   }
+
   async function captureMap() {
     const map = dataSource()?.getMap();
     if (!map) throw new Error("Map is not available. Reload the page and try again.");
     const target = $("terrainMap");
+    const scan = coverage();
     if (typeof window.html2canvas === "function") {
       try {
-        // Only captures the tiles already displayed on the screen.
-        const canvas = await window.html2canvas(target, {
+        // Capture displayed map tiles, but do not rely on html2canvas to
+        // reproduce Leaflet's separate SVG overlay layer.
+        const screenshot = await window.html2canvas(target, {
           useCORS: true, allowTaint: false, backgroundColor: "#edf1f3",
           scale: Math.min(2, window.devicePixelRatio || 2),
           logging: false, imageTimeout: 9000,
           onclone: clonedDocument => {
-            // Omit the SVG overlay in the screen capture. It will be precisely
-            // redrawn from verified scan geometry on the export canvas below.
             const pane = clonedDocument.querySelector("#terrainMap .leaflet-overlay-pane");
             if (pane) pane.style.opacity = "0";
           }
         });
-        if (canvas.width && canvas.height) {
+        if (screenshot.width && screenshot.height) {
+          const canvas = document.createElement("canvas");
+          canvas.width = screenshot.width;
+          canvas.height = screenshot.height;
           const ctx = canvas.getContext("2d");
-          drawCoverageOverlay(ctx, canvas, map, coverage());
-          // Preserve attribution in exports even if the Leaflet control isn't captured.
-          ctx.fillStyle = "rgba(255,255,255,.93)";
-          ctx.fillRect(0,canvas.height-27,canvas.width,27);
-          ctx.fillStyle = "#334455"; ctx.font = "12px Arial";
-          ctx.fillText("Map data: OpenStreetMap contributors | Terrain data: USGS 3DEP", 12, canvas.height-9);
-          return { canvas, fallback: false };
+          if (!ctx) throw new Error("Unable to composite a map image.");
+          // A new canvas has the identity transform and a clean clipping path.
+          // This is essential: never paint overlay geometry directly on the
+          // returned html2canvas context, which can retain a scaled transform.
+          ctx.drawImage(screenshot, 0, 0);
+          const drawn = drawCoverageOverlay(ctx, canvas, map, scan);
+          if (scan?.cells?.length && !drawn) {
+            throw new Error("The current map view contains no visible coverage cells. Center the map on the transmitter and try again.");
+          }
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.fillStyle = "rgba(255,255,255,.95)";
+          ctx.fillRect(0, canvas.height - 29, canvas.width, 29);
+          ctx.fillStyle = "#334455";
+          ctx.font = "12px Arial";
+          ctx.fillText("Map: OpenStreetMap contributors  |  Terrain: USGS 3DEP  |  Model is not an FCC service contour", 12, canvas.height - 9);
+          return { canvas, fallback: false, polygonsDrawn: drawn };
         }
       } catch (error) {
-        console.warn("Map tile capture unavailable; rendering a schematic instead.", error);
+        console.warn("Could not composite map tiles and coverage; rendering a schematic instead:", error);
       }
     }
-    return { canvas: mapVectorFallback(map), fallback: true };
+    return { canvas: mapVectorFallback(map), fallback: true,
+      polygonsDrawn: scan?.cells?.length || 0 };
   }
+
   function canvasDownload(canvas, fileName, quality = .92) {
     return new Promise((resolve, reject) => {
       canvas.toBlob(blob => {

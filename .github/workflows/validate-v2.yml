@@ -25,6 +25,8 @@ jobs:
           node-version: '22'
       - name: Validate scripts, HTML wiring and assets
         run: node tests/check-static.mjs
+      - name: Reject missing samples in point-to-point multipoint analysis
+        run: node tests/check-point-to-point.mjs
       - name: Verify FCC and terrain Worker contracts (mocked)
         if: hashFiles('cloudflare/production-worker-v2-candidate.js') != ''
         run: node tests/check-worker-candidate.mjs

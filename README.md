@@ -98,17 +98,83 @@ A 360° radial uses **48 requested positions**; a point-to-point path offers **4
 
 The point-to-point PDF's **30° orientation sector** is visual context around the measured centerline. It is not a modeled antenna beamwidth or coverage prediction.
 
-## Errors, retries, and current limits
+## Error handling and recovery
 
-Successful verified profiles are cached in browser memory. Temporary service/network failures during a 360° scan receive up to **two automatic retries**. Missing or invalid elevations remain unknown.
+Error handling is layered across the browser, Cloudflare Worker, and export modules. The basic rule is simple: a failed request or missing elevation must not become a confident engineering result.
 
-If temporary failures remain, an optional **five-minute recovery window** can retry only the failed transient bearings, one at a time. It opens only after a user clicks its button. The main page validates returned data before recalculating from its cache.
+### Validation and visible errors
+
+| Condition | Current behavior |
+|---|---|
+| Invalid ASRN, coordinates, antenna heights, or sample settings | Reject the input with a status message before attempting the affected operation. Point-to-point sites must be at least 100 m apart. The Worker also validates its incoming requests. |
+| FCC lookup fails or times out | Show the error and retain existing calculator inputs. Manual horizon calculations remain available. |
+| Address lookup has no usable match | Show the lookup error and allow coordinates to be entered manually. |
+| USGS returns missing, invalid, or misplaced multipoint samples | Reject that profile rather than inventing elevations. A point-to-point result and its PDF require every requested position, including both endpoints. |
+| A 360° bearing cannot be verified | Keep its affected sectors gray, label the study **Incomplete**, and withhold a reliable total visible-area estimate. |
+| An export fails | Show an export-specific status message, record the technical error in the console, and restore the relevant controls according to the available results. |
+
+### Timeouts and bounded automatic retries
+
+Requests have explicit deadlines: the FCC browser lookup uses **15 seconds**; multipoint requests use **35 seconds** in the browser and **30 seconds** for the Worker's upstream USGS call. These limits apply to individual requests, not the total scan duration.
+
+During a **360° scan**, HTTP **408, 429, 500, 502, 503, and 504**, network failures, and request timeouts are considered transient. Each affected radial gets at most **two automatic retries** after approximately **1.5 and 3.5 seconds**, with a small random delay added. Actual missing or invalid elevations are not retried as temporary outages. Point-to-point analysis reports a failure for the user to address or rerun; it does not use this automatic radial retry loop.
+
+The scanner processes four chunks with at most **three profiles in flight**. If every bearing in the first chunk fails, it stops the remaining chunks instead of continuing a full scan against an unavailable service.
+
+### Caching and result state
+
+Successful verified terrain profiles are retained in browser memory and can be reused on a later scan. Failed terrain requests are not stored as successful profiles. A repeated scan can therefore keep good bearings and request the ones that failed, rather than starting from zero.
+
+Relevant input changes clear the displayed terrain results and cancel an active recovery session. The point-to-point PDF control requires a valid path result; CSV and KML controls require a terrain-scan snapshot. An incomplete scan can still be exported with its unknown sectors and incomplete status disclosed.
+
+### Optional five-minute recovery window
+
+If transient bearings remain after the automatic retries, the user can select **Open 5-minute recovery window**:
+
+1. The window opens only after that click. If a browser blocks it, the calculator reports the block and no recovery requests begin.
+2. It retries only eligible failed transient bearings, **one request at a time**, for at most **five minutes**. Repeated failure cycles pause for roughly **5, 10, 20, then 30 seconds**, plus small random delays.
+3. The main calculator checks the message's origin, sender window, session token, coordinates, and returned samples before accepting recovered data. It then rebuilds the map from verified cached profiles without launching another full scan.
+4. Recovery ends when the requested bearings succeed, the time limit expires, the user stops or closes it, the original calculator closes, or the study changes. Non-retryable missing data remain unknown.
+
+**Live acceptance remains open for this optional window.** Its implemented behavior should not be confused with a completed live outage/recovery test.
+
+### Service and export fallbacks
+
+| Failure | Fallback |
+|---|---|
+| A compatible proxy route returns **404 or 405** | Supported elevation/location helpers can use their browser-direct fallback, and 360° sampling can try the legacy profile route. A temporary 502 does not silently switch data methods. Point-to-point analysis continues to require verified multipoint data and refuses legacy polyline results. |
+| Optional USGS source metadata or catalog lookup fails | Retain the terrain calculation and report the available metadata, with missing source details identified as unavailable. Source metadata has separate memoization from the verified terrain-profile cache. |
+| Basemap tiles cannot be captured for export | Generate a clearly identified schematic background with the study geometry. |
+| The PDF library is unavailable | Try the pinned library through alternate CDN providers. If neither loads, show the error; a later export attempt can try again. |
+
+The implementation lives in [script.js](script.js), [terrain.js](terrain.js), [recovery.js](recovery.js), the [production Worker](cloudflare/production-worker-v2-candidate.js), and the source/export modules listed below.
 
 USGS occasionally takes a coffee break. The map waits for actual elevations rather than filling the gaps with enthusiasm.
+
+## Model limits
 
 This Beta models sampled bare-earth geometry. It omits buildings, trees, clutter, Fresnel clearance, diffraction, frequency-specific propagation, transmitter power, antenna patterns, interference, and receiver sensitivity. Narrow ridges or valleys can fall between samples. A green map cannot sign off on your project.
 
 The visible-area estimate is a coarse approximation within the smooth-Earth horizon, not an FCC contour, guaranteed reception area, or measured audience. Population and population-density fields are placeholders awaiting a future data integration.
+
+## How we got here
+
+The current release grew through several versions and many test-and-revise cycles. **v1.9** and **v2.0 Beta** are named releases; the intermediate rows below describe development iterations within that progression, not additional invented release numbers.
+
+| Stage | What changed and what it taught us |
+|---|---|
+| **Initial prototype** | Proved the horizon math and the connection between a browser calculator and a separate Cloudflare data service. An illustrative tower record established the request/response pattern. |
+| **v1.9 baseline** | Combined the horizon calculator, imported FCC tower lookup, manual inputs, and Waypoint Utility Web interface. Terrain and population were still unconnected. |
+| **v2.0 terrain iterations** | Added USGS ground elevation, terrain profiles, receiver selection, and a coarse 360° terrain-visibility map. Real terrain made the smooth-Earth circle a starting point rather than the whole answer. |
+| **Sampling and completeness revisions** | Live polyline responses omitted samples near the receiver. Verifying just the endpoint did not fix an interior gap. The current path workflow uses explicitly requested multipoint positions and requires every elevation, including both endpoints. |
+| **Resilience iterations** | Added bounded retries, reuse of verified profiles, gray unknown sectors, and an optional recovery window. A staged 24-bearing rerun reused 23 successful profiles after one temporary failure; live acceptance of the separate recovery window remains open. |
+| **Export and layout revisions** | Added CSV/KML, map images, and separate one-page visibility and link reports. Real exported PDFs exposed missing overlay rendering, unhelpful framing, unrelated receiver details in a 360° report, and a missing conversion constant. Those issues led to focused fixes and PDF regression checks. |
+| **USGS source-tracking revisions** | Separated DEM raster resolution from calculator sample spacing and carried source IDs/project details through the Worker, browser, scan snapshots, and reports. Testing caught a 360° snapshot that had dropped otherwise valid metadata. |
+| **v2.0 Beta production release, October 29, 2026** | Brought the tested frontend and production Worker together with preserved FCC/D1 behavior, recorded rollback versions, automated checks, and fresh public-site tests. |
+
+There were several rounds of “one last PDF.” The PDFs were not consulted about the schedule.
+
+The useful lesson was that correct on-screen math, complete source data, readable exports, and traceable metadata are separate things to verify. The current checks preserve those lessons so the next improvement has less opportunity to resurrect an old mistake. Detailed test results and earlier acceptance notes remain in the linked release and staging records.
 
 ## Development
 
@@ -195,11 +261,20 @@ For Worker changes, preserve the current source, version, and bindings; validate
 - [USGS provenance design and rollout history](docs/USGS_TERRAIN_PROVENANCE.md)
 - [Staging acceptance history](docs/STAGING_RELEASE_CHECKLIST.md)
 
-## Feedback and next work
+## Feedback
 
 [Open a GitHub issue](https://github.com/Mac1584/tower-horizon/issues) for a bug, question, or feature suggestion. For reproducible results, include the location/ASRN, antenna heights, `k` value, sample/bearing settings, expected behavior, and the error or screenshot.
 
-Next work includes live recovery acceptance, finer terrain analysis and additional RF modeling, and population estimates based on terrain-visible geography. Completed map/report exports and multipoint sampling are part of the current release.
+## Roadmap
+
+Future versions will include:
+
+| Planned capability | Direction |
+|---|---|
+| **Population estimates** | Estimate the population within modeled geography using population datasets, with the source, data vintage, and method identified. Population in an area is distinct from confirmed reception or measured audience. |
+| **Propagation corrections** | Add more detailed propagation corrections beyond the current effective-Earth-radius and sampled-terrain approximation, with documented assumptions and validation. Specific additional models remain to be selected. |
+
+The current release already includes the standard `k = 4/3` radio-horizon approximation and selectable curvature assumptions. The additional propagation corrections and population estimates above are planned capabilities. Live acceptance of the optional recovery window remains a separate validation item for the current Beta.
 
 ## Data credits
 

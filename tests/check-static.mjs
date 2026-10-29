@@ -31,7 +31,7 @@ if(!terrain.includes('new Event("towerPathUpdated")') ||
  errors.push("Point-to-point export status events not wired");
 if(!terrain.includes('getProfile: () => currentProfile'))
  errors.push("Point-to-point results not exposed to exporter");
-if(!html.includes('src="vendor/leaflet-1.9.4.css"'))
+if(!html.includes('href="vendor/leaflet-1.9.4.css"'))
  errors.push("Leaflet CSS not loaded");
 for(const asset of ["waypoint.css","style.css","vendor/leaflet-1.9.4.css","recovery.html"]){
  if(!existsSync(join(root,asset)))errors.push("Missing asset "+asset);

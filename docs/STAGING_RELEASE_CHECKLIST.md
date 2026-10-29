@@ -60,7 +60,7 @@ Official Cloudflare guidance:
 - PDF printed on one 8.5 x 11 inch page; map/attribution/engineering cautions legible.
 - Verify browser console free of unexpected script errors at Cloudflare Pages staging origin.
 
-The point-to-point PDF and new staging-host setup have **not yet been validated in a real browser**; they remain open acceptance items.
+**Hosted staging acceptance (Oct 29, 2026):** Cloudflare Pages `tower-horizon-v2-staging.pages.dev` loaded correctly; FCC ASRN lookup, tower-population of fields and USGS elevation lookup all passed; the user also confirmed a successful 12-bearing 360-degree analysis and successful PDF exports. The dedicated point-to-point report was generated in the hosted browser and inspected as a one-page (612 x 792 pt) US Letter PDF with A/B coordinates, a single 30-degree orientation sector, true bearings, terrain profile, and obstruction/clearance metrics. Remaining release gates include 24/36-bearing stress tests, a live failure/recovery test, and production Worker compatibility/rollback verification.
 
 ## Later: production Cloudflare integration (DO NOT do now)
 
@@ -82,5 +82,5 @@ Worker version URLs: https://developers.cloudflare.com/workers/versions-and-depl
 - Existing staging Worker multipoint handler: manually deployed and validated, 12/12 bearings achieved on a repeated 12-bearing USGS test.
 - The 360 one-page and map PDFs were corrected following user-provided PDFs that omitted overlay polygons; the user confirmed the updated PDFs render correctly.
 - Two automatic transient-failure retries and the optional five-minute separate-window recovery implemented in the development branch; mock tests passed; still needs a live failure/recovery acceptance test.
-- New point-to-point report and 30-degree sector implementation: mock tests passed for one-page PDF creation, event readiness, and map fit/restore; **actual PDF visual QA pending**.
+- Point-to-point report and 30-degree sector: automated test passed, and the hosted PDF was visually reviewed on 2026-10-29. Needham-to-Boston sample report: 9.99 mi, 60.9 deg true A-to-B, 241.1 deg reverse, 50 verified terrain samples, lowest sampled clearance -21.6 ft, status OBSTRUCTED. It fits one Letter page and does not include the 360-degree coverage overlay. It explicitly states that the orientation sector is not antenna beamwidth or predicted coverage.
 - No production site or production Cloudflare Worker changes made as part of this staging candidate.

@@ -326,6 +326,14 @@
     .replace(/[\u2013\u2014]/g,"-").replace(/\u00b0/g, " deg")
     .replace(/\u00b2/g, "^2").replace(/\u00d7/g, "x")
     .replace(/[^\x20-\x7e]/g,"");
+  function pdfShortLine(doc, text, maxPt=550) {
+    const full=pdfText(text);
+    if(doc.getTextWidth(full)<=maxPt)return full;
+    let short=full;
+    while(short.length>12 && doc.getTextWidth(short+"...")>maxPt)
+      short=short.slice(0,-1);
+    return short+"...";
+  }
   // jsPDF is normally preloaded from jsDelivr in index.html. If that CDN
   // fails, recover on the user's PDF-export click using a different host.
   let pdfLibraryPromise = null;
@@ -537,6 +545,11 @@
     await ensurePdfLibrary();
     const result = await captureMap({focusCoverage:true});
     const scan = coverage();
+    // Metadata lookup is optional and read-only. Even if USGS catalogs fail,
+    // we can still export verified terrain visibility with an explicit
+    // "not reported" provenance note.
+    const sources = await window.TowerHorizonTerrainSources?.describeCoverage(scan)
+      .catch(error => { console.warn("USGS source metadata unavailable", error); return null; });
     const doc = pdf("portrait");
     // This report is always a single 612 x 792 pt US Letter page.
     pdfHeader(doc,"Radio horizon and terrain assessment",
@@ -596,11 +609,16 @@
     doc.text(pdfText(first),30,687);
     const secondLines=doc.splitTextToSize(pdfText(second),550);
     doc.text(secondLines.slice(0,2),30,701);
+    doc.setTextColor(35,67,84);doc.setFontSize(7.7);
+    doc.text(pdfShortLine(doc, "USGS DEM raster resolution: " +
+      (sources?.resolutionText || "Not reported by source"),548),30,712);
+    doc.text(pdfShortLine(doc, "USGS source projects: " +
+      (sources?.projectText || "Not reported by source"),548),30,724);
 
-    doc.setTextColor(104,113,120);doc.setFontSize(8);
-    doc.text("Terrain is sampled bare-earth elevation. Buildings, vegetation, Fresnel clearance, diffraction,",30,735);
-    doc.text("field strength and interference are not modeled. Not an FCC service contour.",30,746);
-    doc.text(pdfText(result.fallback?"Schematic map export (base tiles unavailable).":"Map: OpenStreetMap contributors; terrain: USGS 3DEP."),30,759);
+    doc.setTextColor(104,113,120);doc.setFontSize(7.5);
+    doc.text("DEM resolution differs from radial sample spacing. Bare-earth model excludes buildings, trees,",30,739);
+    doc.text("Fresnel clearance, diffraction, field strength and interference. Not an FCC service contour.",30,750);
+    doc.text(pdfText(result.fallback?"Schematic map export (base tiles unavailable).":"Map: OpenStreetMap contributors; terrain: USGS 3DEP."),30,760);
     doc.setDrawColor(181,191,198);doc.line(30,768,582,768);
     doc.setFontSize(8);doc.text("WAYPOINT UTILITY WEB  /  BETA  /  1 OF 1",30,782);
     doc.save(safeName("-one-page-report.pdf"));

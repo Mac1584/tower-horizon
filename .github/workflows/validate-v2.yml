@@ -25,6 +25,8 @@ jobs:
           node-version: '22'
       - name: Validate scripts, HTML wiring and assets
         run: node tests/check-static.mjs
+      - name: Reject missing samples in point-to-point multipoint analysis
+        run: node tests/check-point-to-point.mjs
       - name: Validate staging terrain URL
         if: github.ref_name == 'staging/terrain-v2'
         run: node tests/check-static.mjs --staging

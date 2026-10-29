@@ -317,7 +317,12 @@ async function handleTerrainMultipoint(request) {
         x: p.lon, y: p.lat,
         spatialReference: { wkid: 4326 }
       },
-      value: null
+      // Declare all optional USGS raster metadata fields up front so
+      // Cloudflare's JavaScript/TypeScript analyzer recognizes them.
+      value: null,
+      rasterId: null,
+      resolution: null,
+      sourceDetails: null
     }));
     const bestDistances = Array(n).fill(Infinity);
     for (const candidate of payload.samples) {

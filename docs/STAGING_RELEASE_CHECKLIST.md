@@ -1,6 +1,6 @@
 # Tower Horizon 2.0 - Staging release candidate
 
-**Status:** GitHub-staged candidate; **not yet production-ready**. Date: 2026-10-29.
+**Current status:** Version 2.0 Beta and the production USGS provenance Worker are released. See [production release record](PRODUCTION_RELEASE_2026-10-29.md) for verified checks and remaining acceptance items. The checklist and dated entries below preserve staging history and earlier release gates. Date: 2026-10-29.
 
 ## Environments and safety boundaries
 

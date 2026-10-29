@@ -1,6 +1,6 @@
 # Tower Horizon 2.0 — USGS source DEM provenance
 
-**Release state: pending Cloudflare staging Worker deployment and live visual acceptance.** Prepared October 29, 2026. Do not merge the v2 website or deploy an updated production Worker until the test results and PDF layout have been checked.
+**Release state: deployed to staging and production, October 29, 2026.** See the [production release record](PRODUCTION_RELEASE_2026-10-29.md). The workflow and staging acceptance notes below are retained as release history.
 
 ## What the reports identify
 

@@ -3,15 +3,15 @@
 **USGS 3DEP terrain-aware radio-horizon and line-of-sight planning tool**  
 **VERSION 2.0 · STATUS: BETA** — Waypoint Utility Web
 
-[Live Version 1.9](https://mac1584.github.io/tower-horizon/) · [Version 2.0 draft pull request](https://github.com/Mac1584/tower-horizon/pull/1) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md) · [Staging release checklist](docs/STAGING_RELEASE_CHECKLIST.md) · [Production Worker candidate and integration](docs/PRODUCTION_WORKER_INTEGRATION.md)
+[Live Version 2.0 Beta](https://mac1584.github.io/tower-horizon/) · [Production release record](docs/PRODUCTION_RELEASE_2026-10-29.md) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md) · [Staging release history](docs/STAGING_RELEASE_CHECKLIST.md) · [Production Worker source and integration](docs/PRODUCTION_WORKER_INTEGRATION.md)
 
-> **Release-candidate status (Oct 29, 2026):** Version 2.0 is on `feature/terrain-v2-usgs`. `staging/terrain-v2` powers the Cloudflare Pages preview and uses the separate `tower-terrain-staging` Worker. **The GitHub Pages website remains v1.9**, but the existing production `tower-data-api` Worker has been upgraded with the three USGS terrain endpoints (deployed version `d01a0284-f058-47f2-97d2-e222023f7399`; rollback version `e9e5d798-1b9f-459b-a910-36090a0aeceb`). Live FCC lookup, elevation and 48/48 multipoint checks passed; legacy polyline requests showed near-receiver omissions, so point-to-point analysis now requires complete verified multipoint sampling. Hosted 360-degree and point-to-point PDFs have been reviewed; 72-point multipoint, expanded radial and failure-recovery acceptance remain. See [staging checklist](docs/STAGING_RELEASE_CHECKLIST.md).
+> **Released October 29, 2026:** Version 2.0 Beta is published from `main` on GitHub Pages. The production `tower-data-api` Worker now runs version `85eaabe4-9174-48a3-899b-cc34937370a4`, including USGS raster provenance and the read-only catalog endpoint. Previous production version `d01a0284-f058-47f2-97d2-e222023f7399` is retained for rollback. The existing `DB` → `tower-records` binding is preserved. Automated checks and new-version preview tests passed. Final post-promotion browser verification was interrupted by another Chrome extension panel; optional live five-minute recovery acceptance remains open. See the [release record](docs/PRODUCTION_RELEASE_2026-10-29.md) for exact verification scope.
 
 ## USGS elevation-source provenance (staging candidate)
 
 The Version 2.0 engineering PDFs can now include **reported USGS DEM raster resolution** and the underlying **raster/project name** (with acquisition year when explicitly supplied by the catalog), independently of the **calculator sample spacing**. The source-data summary can contain multiple resolutions/projects across a 360 scan. Missing source metadata is flagged as not reported and never alters geometric terrain calculations.
 
-This requires a new staging Worker deployment **before live acceptance**. The Cloudflare Pages staging frontend automatically receives code from `staging/terrain-v2`, but the existing `tower-terrain-staging` Worker must be updated manually using the complete [staging Worker provenance candidate](cloudflare/staging-worker-v2-provenance.js). The production `tower-data-api` Worker remains unchanged. See [USGS source provenance and staging rollout](docs/USGS_TERRAIN_PROVENANCE.md).
+Source provenance is deployed to both the staging terrain Worker and production `tower-data-api`. Cloudflare Pages staging remains separate from the GitHub Pages production frontend. Worker updates are manual; pushing this repository does not deploy a Worker. See [USGS source provenance and staging rollout](docs/USGS_TERRAIN_PROVENANCE.md).
 
 ## Two primary use cases
 

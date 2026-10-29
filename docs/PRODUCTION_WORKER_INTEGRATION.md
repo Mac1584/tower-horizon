@@ -1,6 +1,6 @@
-# Tower Horizon 2.0 — Production Cloudflare Worker Integration (candidate only)
+# Tower Horizon 2.0 — Production Cloudflare Worker Integration
 
-**Status:** NOT DEPLOYED. Reviewed/reconstructed from the user's existing `tower-data-api` bundled JavaScript on October 29, 2026.
+**Current status:** Deployed October 29, 2026 as version `85eaabe4-9174-48a3-899b-cc34937370a4`. See [production release record](PRODUCTION_RELEASE_2026-10-29.md). The instructions below preserve the original candidate review and rollout procedure; references to the old v1.9 website and unapproved deployment are historical.
 
 ## Production dependencies confirmed
 

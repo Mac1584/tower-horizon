@@ -362,6 +362,36 @@
     if (receiverMarker && map) receiverMarker.setLatLng([p.lat, p.lon]);
     else if (map) receiverMarker = window.L.marker([p.lat, p.lon]).addTo(map).bindPopup("Receiver — select another point by clicking the map");
   }
+  // Confirm the two physical endpoints used in an individual link study.
+  // USGS polyline sampling can omit the final requested point; using that
+  // truncated profile as the remote antenna location would be misleading.
+  async function verifiedLinkProfile(tx, rx, count) {
+    const raw = await getProfile(tx, rx, count);
+    const total = distance(tx, rx);
+    const points = raw.map(s => ({...s}));
+    let repaired = 0;
+    if (points[0].d > 1) {
+      const height = await queryElevation(tx);
+      points.unshift({lat:tx.lat,lon:tx.lon,d:0,elev:height});
+      repaired++;
+    } else {
+      points[0] = {...points[0],lat:tx.lat,lon:tx.lon,d:0};
+    }
+    if (total - points[points.length-1].d > 1) {
+      const height = await queryElevation(rx);
+      points.push({lat:rx.lat,lon:rx.lon,d:total,elev:height});
+      repaired++;
+    } else {
+      points[points.length-1] = {
+        ...points[points.length-1],lat:rx.lat,lon:rx.lon,d:total
+      };
+    }
+    if (points.some((p,i) => !Number.isFinite(p.elev) ||
+        (i && p.d <= points[i-1].d)))
+      throw new Error("Invalid endpoint or distance sequence in point-to-point profile.");
+    return {samples:points,repairedEndpoints:repaired};
+  }
+
   async function analyzeSelectedPath() {
     const tx = point("terrainTxLat", "terrainTxLon"), rx = point("terrainRxLat", "terrainRxLon");
     const txAgl = Number($("radCenter").value) / FT, rxAgl = Number($("receiverHeight").value) / FT;
@@ -376,13 +406,15 @@
     status("terrainPathStatus", "Sampling the USGS terrain profile…");
     const runId = ++analysisCounter;
     try {
-      const samples = await getProfile(tx, rx, Number($("terrainSamples").value));
+      const verified = await verifiedLinkProfile(tx, rx, Number($("terrainSamples").value));
+      const samples = verified.samples;
       if (runId !== analysisCounter) return;
       const result = {
         ...analyze(samples, txAgl, rxAgl, k),
         tx: { ...tx }, rx: { ...rx },
         txAglFt: txAgl * FT, rxAglFt: rxAgl * FT,
         k, samplesRequested: Number($("terrainSamples").value),
+        endpointRepairs: verified.repairedEndpoints,
         sampledAt: new Date().toISOString()
       };
       currentProfile = result;
@@ -398,7 +430,8 @@
         if (!receiverMarker) setReceiver(rx);
       }
       status("terrainPathStatus", fmt(result.distanceM / MI) + " mi path analyzed (" + samples.length +
-        " USGS samples). Clearance is geometric only; terrain obstructions may lie between samples.");
+        " USGS samples, " + verified.repairedEndpoints +
+        " verified endpoint repairs). Clearance is geometric only; terrain obstructions may lie between samples.");
     } catch (error) { status("terrainPathStatus", "Terrain analysis failed: " + error.message, true); }
     finally { $("analyzePath").disabled = false; }
   }

@@ -55,10 +55,11 @@ const canvas=()=>({
 });
 const restore=[];
 const map={
+  options:{zoomSnap:1},
   getCenter:()=>({lat:42.3,lng:-71.2}),
   getZoom:()=>9,
-  fitBounds:(bounds)=>{restore.push(["fitBounds",bounds]);},
-  setView:(center,zoom)=>{restore.push(["setView",zoom]);},
+  fitBounds:(bounds)=>{restore.push(["fitBounds",bounds,map.options.zoomSnap]);},
+  setView:(center,zoom)=>{restore.push(["setView",zoom,map.options.zoomSnap]);},
   getSize:()=>({x:800,y:420}),
   latLngToContainerPoint:([lat,lon])=>
     ({x:400+(lon+71.218)*160,y:210-(lat-42.303)*160})
@@ -108,8 +109,12 @@ assert(lines.some(s=>s.includes("USGS DEM raster resolution: 1 m (576)")));
 assert(lines.some(s=>s.includes("USGS source projects: MA_CentralEastern_2021_B21")));
 assert(lines.some(s=>s.includes("48 points, ~1.1 mi apart")));
 assert(lines.some(s=>s.includes("6,085 sq mi")));
-assert(restore.some(x=>x[0]==="fitBounds"),"360 PDF did not frame coverage");
-assert(restore.some(x=>x[0]==="setView"),"360 PDF did not restore original map");
+assert(restore.some(x=>x[0]==="fitBounds" && x[2]===0.25),
+  "PDF map should use quarter-level zoom snapping to fill more of print area");
+assert(restore.some(x=>x[0]==="setView" && x[2]===1),
+  "PDF map should restore the user's original zoom setting");
+assert.equal(map.options.zoomSnap,1,
+  "Map's original Leaflet zoomSnap must be restored after PDF export");
 assert(ctxCalls.some(x=>x[0]==="fill"),"Coverage polygon was not rendered");
 assert(!lines.some(s=>s.includes("Path: -")),"360 report leaked empty point-to-point result");
 console.log("PASS: full 12-bearing 360 PDF export exercised without missing constants;");

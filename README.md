@@ -5,7 +5,7 @@
 
 [Live Version 1.9](https://mac1584.github.io/tower-horizon/) · [Version 2.0 draft pull request](https://github.com/Mac1584/tower-horizon/pull/1) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md) · [Staging release checklist](docs/STAGING_RELEASE_CHECKLIST.md)
 
-> **Release-candidate status:** Version 2.0 is on the `feature/terrain-v2-usgs` branch. A separate `staging/terrain-v2` branch points terrain requests to the already deployed `tower-terrain-staging` Worker for Cloudflare Pages staging previews. The live GitHub Pages website remains v1.9, and the production FCC Worker is unchanged. The 360-degree map/PDF exports were tested in Chrome, but the newest point-to-point report and recovery flow still need browser acceptance testing. See [staging checklist](docs/STAGING_RELEASE_CHECKLIST.md).
+> **Release-candidate status (Oct 29, 2026):** Version 2.0 is on `feature/terrain-v2-usgs`. `staging/terrain-v2` powers the Cloudflare Pages preview and uses the separate `tower-terrain-staging` Worker. **The GitHub Pages website remains v1.9**, but the existing production `tower-data-api` Worker has been upgraded with the three USGS terrain endpoints (deployed version `d01a0284-f058-47f2-97d2-e222023f7399`; rollback version `e9e5d798-1b9f-459b-a910-36090a0aeceb`). Live FCC lookup, elevation and 48/48 multipoint checks passed; legacy polyline requests showed near-receiver omissions, so point-to-point analysis now requires complete verified multipoint sampling. Hosted 360-degree and point-to-point PDFs have been reviewed; 72-point multipoint, expanded radial and failure-recovery acceptance remain. See [staging checklist](docs/STAGING_RELEASE_CHECKLIST.md).
 
 ## Two primary use cases
 
@@ -35,7 +35,7 @@ Tower Horizon Calculator 2.0 adds terrain elevation data to the existing broadca
 | Website | GitHub Pages, HTML/CSS/JavaScript | Inputs, original horizon calculator, visualization, results |
 | Backend | Cloudflare production `tower-data-api` and separate staging `tower-terrain-staging` | Keep FCC production stable while testing terrain routes |
 | Elevation | USGS Elevation Point Query Service (EPQS) | Ground elevation at a transmitter coordinate |
-| Profiles | USGS 3DEP ImageServer `getSamples` | Existing polyline path lookups; new 48-point multipoint sampling for radial scans in staging |
+| Profiles | USGS 3DEP ImageServer `getSamples` | Verified multipoint elevations for 360-degree (48/radial) and point-to-point (selectable 72 default); legacy polyline API retained for compatibility |
 | Address lookup | U.S. Census Geocoder | Optional receiver street-address location |
 | Maps | Leaflet and OpenStreetMap tiles | Receiver selection and schematic viewshed overlay |
 | Analysis | JavaScript | Curvature-adjusted path, clearance, height and viewshed estimates |

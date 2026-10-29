@@ -250,9 +250,19 @@
     const target = $("terrainMap");
     const scan = coverage();
     const reportFocused = options.focusCoverage === true && !!scan?.radiusM;
-    const previousView = reportFocused ? {center:map.getCenter(),zoom:map.getZoom()} : null;
+    const previousView = reportFocused ? {
+      center:map.getCenter(),
+      zoom:map.getZoom(),
+      zoomSnap:map.options?.zoomSnap
+    } : null;
     try {
       if (reportFocused) {
+        // Use quarter-level zoom snapping for the print view only.
+        // Leaflet's default integer zoom can make a coverage circle occupy
+        // less than half of the short, wide map canvas when the next whole
+        // zoom level would not fit. Restore the user's zoomSnap afterward.
+        if (typeof previousView.zoomSnap === "number")
+          map.options.zoomSnap = 0.25;
         // A 360 report frames only its transmitter-centered coverage circle,
         // never an unrelated receiver or a prior user-panned map position.
         const latitudeDegrees = scan.radiusM / 6371000 * 180 / Math.PI;
@@ -311,8 +321,11 @@
     return { canvas: schematic, fallback: true,
       polygonsDrawn: scan?.cells?.length || 0 };
     } finally {
-      if (previousView)
+      if (previousView) {
+        if (typeof previousView.zoomSnap === "number")
+          map.options.zoomSnap = previousView.zoomSnap;
         map.setView(previousView.center,previousView.zoom,{animate:false});
+      }
     }
   }
 

@@ -593,6 +593,8 @@
     $("exportCsv").disabled=!available;
     $("exportKml").disabled=!available;
   }
+  // Shared PDF-loader entrypoint for the independent point-to-point report.
+  window.TowerHorizonExports = Object.freeze({ ensurePdfLibrary });
   $("exportCsv").addEventListener("click",()=>runExport("exportCsv",radialsCSV));
   $("exportKml").addEventListener("click",()=>runExport("exportKml",cellsKML));
   $("exportJpeg").addEventListener("click",()=>runExport("exportJpeg",mapJPEG));

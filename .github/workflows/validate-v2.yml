@@ -25,6 +25,9 @@ jobs:
           node-version: '22'
       - name: Validate scripts, HTML wiring and assets
         run: node tests/check-static.mjs
+      - name: Verify FCC and terrain Worker contracts (mocked)
+        if: hashFiles('cloudflare/production-worker-v2-candidate.js') != ''
+        run: node tests/check-worker-candidate.mjs
       - name: Validate staging terrain URL
         if: github.ref_name == 'staging/terrain-v2'
         run: node tests/check-static.mjs --staging

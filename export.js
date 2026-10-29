@@ -592,7 +592,7 @@
 
     doc.setDrawColor(181,191,198);doc.line(30,657,582,657);
     doc.setTextColor(25,59,88);doc.setFont("helvetica","bold");doc.setFontSize(9);
-    doc.text("ENGINEERING INPUTS AND RESULTS",30,673);
+    doc.text("ENGINEERING INPUTS / USGS TERRAIN SOURCES",30,673);
     doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(64,81,91);
     const k = Number(val("terrainK"));
     const kLabel = Math.abs(k - 4 / 3) < .001 ? "4/3 (Standard RF)" :

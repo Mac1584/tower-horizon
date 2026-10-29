@@ -93,7 +93,9 @@ The user tested production version `d01a0284-f058-47f2-97d2-e222023f7399` using 
 
 - `POST /terrain/multipoint`: `sampleMethod=multipoint`, `requestedCount=48`, `returnedCount=48`, `complete=true`, empty `missingIndices`. **PASS.**
 - `POST /terrain/profile`: `source=USGS 3DEP`, `sampleCount=49`, `complete=false`, `endpointAdded=true`, `missingSampleIds=[47]`. The appended receiver locationId `49` has `exactEndpoint=true`, location `(-71.0589,42.3601)` and elevation `10.126227379` meters. **PARTIAL: endpoint verified, but original USGS polyline sample ID 47 is absent.**
-- Do **not** describe the polyline path as complete based solely on the appended endpoint; inspect sample spacing and repeat with another sample count to determine whether the omission creates a significant spatial gap. Keep live website v1.9 and production Worker version/rollback unchanged pending acceptance.
+- Repeated with 72 requested profile samples: `sampleCount=73`, `complete=false`, `endpointAdded=true`, `missingSampleIds=[70]`. Omission of an interior polyline sample near the receiver recurs across sample counts. Do **not** describe the polyline as complete based solely on a separately verified endpoint.
+- **Front-end mitigation committed** to both `feature/terrain-v2-usgs` and `staging/terrain-v2`: point-to-point calls `POST /terrain/multipoint` instead of `/terrain/profile`, demanding exactly the requested geolocated elevations, including both endpoints. Missing values, invalid order, and any legacy polyline fallback are rejected; no PDF report is enabled on failure. The `/terrain/profile` Worker endpoint is retained for API compatibility; it no longer powers point-to-point analysis in the updated frontend.
+- **Next gate:** verify production `/terrain/multipoint` at **72/72** samples using the exact Needham FCC coordinates. Then refresh Cloudflare staging Pages, rerun the Needham/Boston point-to-point analysis and inspect the PDF. Keep the live website v1.9 and production Worker version/rollback unchanged until acceptance.
 
 ## Test and release record
 

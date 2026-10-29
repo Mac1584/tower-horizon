@@ -1,0 +1,30 @@
+name: Tower Horizon 2.0 static smoke check
+
+on:
+  push:
+    branches:
+      - feature/terrain-v2-usgs
+      - staging/terrain-v2
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate scripts, HTML wiring and assets
+        run: node tests/check-static.mjs
+      - name: Validate staging terrain URL
+        if: github.ref_name == 'staging/terrain-v2'
+        run: node tests/check-static.mjs --staging

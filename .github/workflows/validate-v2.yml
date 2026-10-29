@@ -29,6 +29,8 @@ jobs:
         run: node tests/check-point-to-point.mjs
       - name: Verify DEM provenance reporting and missing-source fallbacks
         run: node tests/check-terrain-sources.mjs
+      - name: Validate staging-only Worker endpoints and USGS metadata
+        run: node tests/check-staging-worker.mjs
       - name: Verify FCC and terrain Worker contracts (mocked)
         if: hashFiles('cloudflare/production-worker-v2-candidate.js') != ''
         run: node tests/check-worker-candidate.mjs

@@ -63,7 +63,7 @@
     }).sort((a,b)=>b.count-a.count);
     const resParts=resolutions.map(x=>meters(x.meters)+" m ("+x.count+")");
     if (resolutionMissing)resParts.push("not reported ("+resolutionMissing+")");
-    const resText=resParts.length ? resParts.slice(0,3).join("; ") +
+    const resText=resolutions.length ? resParts.slice(0,3).join("; ") +
       (resParts.length>3 ? "; +"+(resParts.length-3)+" more" : "") :
       "Not reported by USGS for these samples";
     const named=new Map();

@@ -171,6 +171,8 @@ const worker = {
       return handleTerrainProfile(request);
     if (url.pathname === "/terrain/multipoint")
       return handleTerrainMultipoint(request);
+    if (url.pathname === "/terrain/catalog")
+      return handleTerrainCatalog(request);
     if (url.pathname.startsWith("/terrain/")) {
       if (request.method === "OPTIONS")
         return new Response(null, { status: 204, headers: TERRAIN_CORS });
@@ -369,6 +371,10 @@ async function handleTerrainMultipoint(request) {
     endpoint.searchParams.set("geometryType", "esriGeometryMultipoint");
     endpoint.searchParams.set("geometry", JSON.stringify(geometry));
     endpoint.searchParams.set("returnFirstValueOnly", "true");
+    // Source fields are optional in some USGS mosaics. Request them when
+    // offered without depending on them for the terrain calculation.
+    endpoint.searchParams.set("outFields",
+      "Name,ProductName,Source,AcquisitionDate,title,VerticalDatum");
     endpoint.searchParams.set("f", "json");
 
     const upstream = await fetch(endpoint.toString(), {
@@ -414,6 +420,29 @@ async function handleTerrainMultipoint(request) {
           meters < bestDistances[nearest]) {
         bestDistances[nearest] = meters;
         ordered[nearest].value = elevation;
+        // ArcGIS getSamples returns the individual source raster ID and
+        // spatial resolution. Never substitute our radial sample spacing.
+        const rasterId = Number(candidate.rasterId);
+        const resolution = Number(candidate.resolution);
+        ordered[nearest].rasterId =
+          Number.isSafeInteger(rasterId) && rasterId > 0 ? rasterId : null;
+        ordered[nearest].resolution =
+          Number.isFinite(resolution) && resolution > 0 && resolution < 1e6 ?
+          resolution : null;
+        const attr = candidate.attributes;
+        if (attr && typeof attr === "object") {
+          const safe = (v, max = 160) => typeof v === "string" ?
+            v.trim().slice(0, max) || null : null;
+          ordered[nearest].sourceDetails = {
+            name: safe(attr.Name),
+            title: safe(attr.title, 200),
+            product: safe(attr.ProductName),
+            provider: safe(attr.Source),
+            verticalDatum: safe(attr.VerticalDatum),
+            acquisitionDate: typeof attr.AcquisitionDate === "number" &&
+              Number.isFinite(attr.AcquisitionDate) ? attr.AcquisitionDate : null
+          };
+        }
       }
     }
     const missingIndices = ordered.filter(p => p.value === null).map(p => p.index);
@@ -436,3 +465,82 @@ async function handleTerrainMultipoint(request) {
   }
 }
 
+/**
+ * Optional read-only USGS raster catalog metadata lookup.
+ *
+ * Staging Worker fetch() dispatch (BEFORE default/not-found routes):
+ *   if (url.pathname === "/terrain/catalog")
+ *     return handleTerrainCatalog(request);
+ *
+ * GET /terrain/catalog?ids=88413,88414
+ * Returns source identity for the given USGS ImageServer rasterId values.
+ * Never changes existing elevation, profile or multipoint analysis.
+ */
+async function handleTerrainCatalog(request) {
+  const cors = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+  const reply = (data, status = 200) => Response.json(data, {
+    status, headers: { ...cors, "Cache-Control": "public, max-age=86400" }
+  });
+  if (request.method === "OPTIONS")
+    return new Response(null, { status: 204, headers: cors });
+  if (request.method !== "GET")
+    return reply({ error: "Use GET for catalog metadata" }, 405);
+
+  const query = new URL(request.url).searchParams.get("ids") || "";
+  const parts = query.split(",").map(p => p.trim());
+  if (!parts.length || parts.length > 24 ||
+      parts.some(p => !/^[1-9]\d{0,8}$/.test(p)))
+    return reply({ error: "Provide 1 to 24 comma-separated positive raster IDs" }, 400);
+  const ids = [...new Set(parts.map(Number))];
+  const uri = new URL(
+    "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/query"
+  );
+  uri.searchParams.set("objectIds", ids.join(","));
+  uri.searchParams.set("outFields",
+    "OBJECTID,Name,ProductName,Source,AcquisitionDate,title,VerticalDatum,DEM_Type");
+  uri.searchParams.set("returnGeometry", "false");
+  uri.searchParams.set("f", "json");
+  try {
+    const upstream = await fetch(uri.toString(), {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!upstream.ok) throw new Error("Catalog HTTP " + upstream.status);
+    const data = await upstream.json();
+    if (data.error || !Array.isArray(data.features))
+      throw new Error("USGS raster catalog response invalid");
+    const records = {};
+    const safe = (v, length = 160) => typeof v === "string" ?
+      v.trim().slice(0, length) || null : null;
+    for (const item of data.features) {
+      const a = item?.attributes;
+      const id = Number(a?.OBJECTID);
+      if (!ids.includes(id)) continue;
+      records[id] = {
+        rasterId: id,
+        name: safe(a.Name),
+        title: safe(a.title, 200),
+        product: safe(a.ProductName),
+        provider: safe(a.Source),
+        verticalDatum: safe(a.VerticalDatum),
+        acquisitionDate: typeof a.AcquisitionDate === "number" &&
+          Number.isFinite(a.AcquisitionDate) ? a.AcquisitionDate : null,
+        // DEM_Type is a catalog code; do not interpret it as pixel size or
+        // automatically label a raster "lidar" based solely on that code.
+        demTypeCode: Number.isInteger(a.DEM_Type) ? a.DEM_Type : null
+      };
+    }
+    return reply({
+      source: "USGS 3DEP ImageServer raster catalog",
+      requestedIds: ids,
+      records
+    });
+  } catch (error) {
+    console.error("USGS source catalog failed:", error);
+    return reply({ error: "USGS raster catalog temporarily unavailable" }, 502);
+  }
+}

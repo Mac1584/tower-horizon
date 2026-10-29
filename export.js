@@ -385,6 +385,15 @@
       val("location") || point("terrainTxLat","terrainTxLon"),792);
     doc.setFillColor(239,242,244); doc.rect(32,90,728,444,"F");
     drawImageContained(doc,result.canvas,36,94,720,436);
+    const scan = coverage();
+    doc.setTextColor(25,59,88);doc.setFont("helvetica","bold");doc.setFontSize(9);
+    const mapSummary = scan
+      ? (scan.bearings - scan.failedBearings) + "/" + scan.bearings +
+        " verified bearings | " + scan.rings + " rings | " +
+        (scan.complete ? fmt(scan.terrainVisibleAreaSqMi, 0) + " sq mi estimated visible" : "Incomplete area") +
+        " | " + scan.unknownSectors + " unknown sectors"
+      : "No 360-degree terrain scan has been run";
+    doc.text(pdfText(mapSummary),34,542);
     doc.setTextColor(64,81,91);doc.setFont("helvetica","normal");doc.setFontSize(9);
     doc.text(pdfText("Green: terrain clear | Red: terrain blocked | Gray: unknown | Blue: theoretical radio horizon"),34,556);
     doc.text(pdfText("USGS 3DEP sampling; not a signal prediction or FCC service contour. Map data: OpenStreetMap contributors."),34,573);
@@ -420,6 +429,82 @@
       return canvas;
     } finally {URL.revokeObjectURL(src);}
   }
+  function drawCoverageDiagnostics(doc, scan, chart) {
+    // One page: show scan diagnostics in the space formerly reserved for an
+    // empty selected-path chart. This does not imply a path analysis was run.
+    const x = 30, y = 515, w = 552, h = 129;
+    doc.setDrawColor(148,159,169);
+    doc.setFillColor(248,249,250);
+    doc.rect(x,y,w,h,"FD");
+    doc.setTextColor(25,59,88);
+    if (!scan) {
+      doc.setFont("helvetica","normal"); doc.setFontSize(10);
+      doc.text("Run Calculate Terrain-Visible Area to include verified coverage results.",42,567);
+      if (chart) drawImageContained(doc,chart,36,581,540,55);
+      return;
+    }
+
+    const verified = scan.bearings - scan.failedBearings;
+    const cells = Array.isArray(scan.cells) ? scan.cells : [];
+    const clear = cells.filter(c => c.status === "terrain_clear").length;
+    const blocked = cells.filter(c => c.status === "terrain_blocked").length;
+    const unknown = cells.filter(c => c.status === "unknown").length;
+    const resultsLine = verified + "/" + scan.bearings + " verified bearings  |  " +
+      scan.rings + " distance rings  |  " +
+      (scan.samplesPerBearing * scan.bearings).toLocaleString("en-US") +
+      " sampled terrain positions  |  " + scan.unknownSectors + " unknown sectors";
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(9);
+    doc.text(pdfText(scan.complete ? "SCAN COMPLETE" : "SCAN INCOMPLETE - UNKNOWN TERRAIN REMAINS"),42,531);
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(8.4);
+    doc.setTextColor(64,81,91);
+    doc.text(pdfText(resultsLine),42,545);
+
+    if (chart) {
+      // When a selected receiving path was also analyzed, show its elevation
+      // profile without sacrificing the scan's verified-status summary.
+      drawImageContained(doc,chart,35,551,542,89);
+      return;
+    }
+
+    const summary = [
+      ["MOSTLY TERRAIN-CLEAR CELLS",clear],
+      ["MOSTLY TERRAIN-BLOCKED CELLS",blocked],
+      ["UNKNOWN TERRAIN CELLS",unknown]
+    ];
+    const centers=[116,298,480];
+    summary.forEach((metric,i)=>{
+      doc.setTextColor(79,97,109);doc.setFont("helvetica","normal");doc.setFontSize(7.8);
+      doc.text(pdfText(metric[0]),centers[i],567,{align:"center"});
+      doc.setTextColor(25,59,88);doc.setFont("helvetica","bold");doc.setFontSize(16);
+      doc.text(fmt(metric[1],0),centers[i],586,{align:"center"});
+    });
+
+    const total = clear + blocked + unknown;
+    const segments = [
+      {n:clear,color:[18,110,66]},
+      {n:blocked,color:[170,45,48]},
+      {n:unknown,color:[98,107,117]}
+    ];
+    let pos=42;
+    const length=528;
+    doc.setFillColor(229,233,236);doc.rect(pos,602,length,13,"F");
+    if(total){
+      segments.forEach(segment=>{
+        const portion=length*segment.n/total;
+        if(portion>0) {
+          doc.setFillColor(...segment.color);
+          doc.rect(pos,602,portion,13,"F");
+          pos+=portion;
+        }
+      });
+    }
+    doc.setTextColor(79,97,109);doc.setFont("helvetica","normal");doc.setFontSize(8);
+    doc.text("Classification of " + fmt(total,0) +
+      " sampled map cells; colors indicate terrain visibility, not received signal strength.",42,630);
+  }
+
   async function onePageReport() {
     await ensurePdfLibrary();
     const result = await captureMap();
@@ -458,13 +543,9 @@
     drawImageContained(doc,result.canvas,33,255,546,230);
 
     doc.setTextColor(25,59,88);doc.setFont("helvetica","bold");doc.setFontSize(10);
-    doc.text("ELEVATION CROSS-SECTION",30,507);
-    doc.setDrawColor(148,159,169);doc.rect(30,515,552,129);
-    if (chart) drawImageContained(doc,chart,33,518,546,123);
-    else {
-      doc.setFont("helvetica","normal");doc.setFontSize(10);doc.setTextColor(79,97,109);
-      doc.text("Run Analyze Selected Path to include a terrain elevation profile.",41,577);
-    }
+    doc.text(chart ? "COVERAGE TEST RESULTS & ELEVATION PROFILE" :
+      "COVERAGE TEST RESULTS",30,507);
+    drawCoverageDiagnostics(doc,scan,chart);
 
     doc.setDrawColor(181,191,198);doc.line(30,657,582,657);
     doc.setTextColor(25,59,88);doc.setFont("helvetica","bold");doc.setFontSize(9);

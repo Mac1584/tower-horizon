@@ -180,7 +180,18 @@
         missing.push(i);
         return null;
       }
-      return { lat: location.lat, lon: location.lon, d: total * i / (n - 1), elev: elevation };
+      // This source metadata is descriptive only; missing/unknown source
+      // fields never alter the elevation or inferred geometric clearance.
+      const sourceId = Number(entry.rasterId), sourceResolution = Number(entry.resolution);
+      return {
+        lat: location.lat, lon: location.lon, d: total * i / (n - 1),
+        elev: elevation,
+        rasterId: Number.isSafeInteger(sourceId) && sourceId > 0 ? sourceId : null,
+        resolution: entry.resolution != null && Number.isFinite(sourceResolution) &&
+          sourceResolution > 0 ? sourceResolution : null,
+        sourceDetails: entry.sourceDetails && typeof entry.sourceDetails === "object" ?
+          entry.sourceDetails : null
+      };
     });
     if (missing.length)
       throw new Error("USGS has no valid elevation at " + missing.length + " of " + n +
@@ -921,7 +932,8 @@
     window.TowerHorizonData = Object.freeze({
       getMap: () => map,
       getCoverage: () => coverageSnapshot,
-      getProfile: () => currentProfile
+      getProfile: () => currentProfile,
+      getTerrainApi: () => TOWER_API
     });
     updateAntennaDisplay();
   }

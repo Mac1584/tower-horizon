@@ -109,6 +109,10 @@ The user uploaded a one-page 360-degree PDF from a completed **36/36 bearing** C
 
 The 36-bearing PDF exposed report-only presentation issues: it included old receiver coordinates far outside the 360-degree study and a marker at that unrelated receiver; the map framing wasted space; empty point-to-point results appeared, `mi^2` rendered as text, and k was shown to 13 decimal places. The `export.js` correction has been committed to feature and staging branches and has not altered backend calculations. **Fresh hosted 360 PDF visual QA is still required** after the staging Pages update. Source-resolution metadata is not yet retained in the 360 multipoint Worker; it should not be inferred from the 48-point radial sampling interval.
 
+### Staging Worker rollback checkpoint — October 29, 2026
+
+User-provided **pre-upgrade Cloudflare staging Worker version ID:** `a5945023-d91b-4f66-af80-4c5600eaa863`. Preserve this deployment as the rollback reference for `tower-terrain-staging` only. The initial attempt to paste the new staging Worker code produced Cloudflare editor parse error `Uncaught SyntaxError: Unexpected token 'catch'` at `worker.js:140:4`, before a confirmed successful deploy. **Do not change the production `tower-data-api` Worker**. The GitHub candidate and mocked automated tests parse and pass; inspect the active Cloudflare editor for leftover old Worker code or partial paste and re-paste the entire standalone candidate file into `worker.js`, ensuring only one top-level worker module. Do not claim staging deployment or PDF acceptance until separately verified.
+
 ### DEM source provenance upgrade — prepared but NOT deployed (Oct 29, 2026)
 
 **Goal:** distinguish the reported resolution of the USGS raster (e.g. `resolution: 1`) from the calculator's 48-elevation/72-elevation sample spacing, and identify the underlying raster/project name and acquisition year if USGS supplies it. The user's raster `88413` resolved to `MA_CentralEastern_2021_B21`, `USGS_3DEP`, `DEM_Type: 1`; that catalog code is NOT a proven spatial resolution or a guaranteed lidar classifier.

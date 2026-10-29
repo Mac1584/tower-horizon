@@ -151,7 +151,7 @@ The 360-degree scan requests at most three USGS terrain profiles concurrently an
 - **Map JPEG and Map PDF:** export the current displayed map. The browser first attempts to capture displayed tiles with html2canvas; where browser/cross-origin restrictions prevent this, it exports a clearly labeled schematic map with the actual overlay instead.
 - **One-page PDF report:** creates a native one-page **US Letter (8.5 × 11 in)** PDF with inputs, main results, map, profile chart (when calculated), and model limitations using jsPDF. Reports identify unknown/incomplete terrain analysis.
 
-Map image and PDF exports run in the browser and require the pinned html2canvas 1.4.1 and jsPDF 2.5.2 client libraries to load. No export uploads your data to a separate server. Map tiles remain subject to OpenStreetMap attribution and usage policy. Use caution: grayscale styling is a visual filter on the existing OSM raster tiles, not a separate map service.
+Map image and PDF exports run in the browser and use pinned html2canvas 1.4.1 and jsPDF 2.5.2. jsPDF loads from the npm-backed jsDelivr URL, with an on-demand unpkg fallback if the initial CDN fails. No export uploads your data to a separate server. Map tiles remain subject to OpenStreetMap attribution and usage policy. Use caution: grayscale styling is a visual filter on the existing OSM raster tiles, not a separate map service.
 
 ## Getting started
 

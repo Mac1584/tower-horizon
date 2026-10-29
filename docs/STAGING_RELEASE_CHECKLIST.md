@@ -109,6 +109,16 @@ The user uploaded a one-page 360-degree PDF from a completed **36/36 bearing** C
 
 The 36-bearing PDF exposed report-only presentation issues: it included old receiver coordinates far outside the 360-degree study and a marker at that unrelated receiver; the map framing wasted space; empty point-to-point results appeared, `mi^2` rendered as text, and k was shown to 13 decimal places. The `export.js` correction has been committed to feature and staging branches and has not altered backend calculations. **Fresh hosted 360 PDF visual QA is still required** after the staging Pages update. Source-resolution metadata is not yet retained in the 360 multipoint Worker; it should not be inferred from the 48-point radial sampling interval.
 
+### Step 62 — 12-bearing 360 scan completed; PDF export MI bug fixed and regression-tested (October 29, 2026)
+
+The user ran a **fresh 12-bearing scan** on Cloudflare Pages staging after USGS source-provenance deployment. The browser screenshot confirms **12/12 bearings**, **48 samples/bearing (576 elevations)**, four complete chunks, 40 distance rings, **12 multipoint / 0 legacy** queries, **6,085 mi²** estimated terrain-visible area, and **51.9 mi** smooth-Earth horizon. The map displays green/red classified terrain regions and a dashed blue horizon.
+
+**Blocker encountered:** Clicking *One-page PDF report* returned `Export failed: MI is not defined`. Root cause: the recent new *Radial sampling* line in `export.js` referenced `scan.radiusM / MI` without defining `MI` in that module. This was **PDF formatting/runtime only**, not a USGS sampling or terrain calculation failure.
+
+**Fix:** Added `const MI = 1609.344;` (meters per international mile) in `export.js` on both `staging/terrain-v2` and `feature/terrain-v2-usgs` branches. Added an offline end-to-end browser/PDF mock test `tests/check-360-pdf.mjs` that clicks the export handler, exercises tower-centered coverage capture, verifies PDF sample-spacing/source-resolution/project/area text, and checks map-view restoration. Integrated the test into GitHub Actions. **Feature-branch CI run `40939675424` completed successfully.** The staging branch may need a short Cloudflare Pages deployment interval; hard refresh after deployment and **rerun the 12-bearing scan** before downloading the report.
+
+**Acceptance remaining:** This code fix is tested but the user's real browser PDF **has not yet been downloaded or visually checked** after the fix. Request the newly exported one-page 360 PDF. Confirm centered transmitter, no unrelated receiver, 576 samples and source projects/resolutions, correct k label, area and single-page layout. The separate five-minute recovery test remains incomplete. Do not deploy code to the production Worker or merge GitHub Pages v2 until accepted.
+
 ### Step 61 — FCC Needham point-to-point PDF accepted (October 29, 2026)
 
 The user uploaded `tower-horizon-1004233-2026-10-29-point-to-point (1).pdf` (generated 3:16:51 PM), the **actual FCC-coordinate** one-page report for the Needham ASRN `1004233` to Boston `42.3601,-71.0589` link. The assistant read and visually rendered the PDF (one US Letter 612 × 792 pt page) and confirmed:

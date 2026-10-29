@@ -109,6 +109,21 @@ The user uploaded a one-page 360-degree PDF from a completed **36/36 bearing** C
 
 The 36-bearing PDF exposed report-only presentation issues: it included old receiver coordinates far outside the 360-degree study and a marker at that unrelated receiver; the map framing wasted space; empty point-to-point results appeared, `mi^2` rendered as text, and k was shown to 13 decimal places. The `export.js` correction has been committed to feature and staging branches and has not altered backend calculations. **Fresh hosted 360 PDF visual QA is still required** after the staging Pages update. Source-resolution metadata is not yet retained in the 360 multipoint Worker; it should not be inferred from the 48-point radial sampling interval.
 
+### Step 61 — FCC Needham point-to-point PDF accepted (October 29, 2026)
+
+The user uploaded `tower-horizon-1004233-2026-10-29-point-to-point (1).pdf` (generated 3:16:51 PM), the **actual FCC-coordinate** one-page report for the Needham ASRN `1004233` to Boston `42.3601,-71.0589` link. The assistant read and visually rendered the PDF (one US Letter 612 × 792 pt page) and confirmed:
+- TX coordinates `42.302972,-71.218028` (rounded FCC `42.30297222,-71.21802778`), antenna `1174.5 ft AGL`, local USGS ground `147.2 ft AMSL`, antenna center `1321.7 ft AMSL`.
+- RX `42.3601,-71.0589`, `6 ft AGL`, USGS ground `33.2 ft AMSL`, antenna center `39.2 ft AMSL`.
+- Path `9.04 miles`, geometric `OBSTRUCTED`, minimum sampled clearance `-16.9 ft`, forward bearing `64 deg`, reverse bearing `244.2 deg`, `k = 1.333`, worst sample `8.78 mi from A`, and approximate additional height `801 ft at A OR 17 ft at B`. These **match the earlier exact-FCC-coordinate baseline** from before the source-metadata enhancements.
+- `72 verified samples` spaced approximately `672 ft`; `USGS DEM raster resolution: 1 m (72)`; `USGS source projects: MA_CentralEastern_2021_B21`.
+- The original two-site panels, one 30-degree orientation-sector context map, elevation profile and USGS source section render on one page without overlap or major clipping. Minor nonblocking issue: the copyright/status footer is close to the bottom page edge.
+- **Scope limitation:** The report identifies the *project* name, not every unique raster ID encountered. The earlier separate 48-sample Needham-to-Boston query included four distinct raster IDs. Do not infer that all 72 samples came from the same raster because the project summary shows only one name.
+- The report remains a **preliminary sampled geometric clearance** model; it does not include Fresnel-zone, vegetation/building, diffraction, field strength or full RF link-budget effects.
+
+**Acceptance: PASS — exact FCC Needham point-to-point PDF with verified 72-sample multipoint DEM provenance.** No calculation regression indicated. The live production `tower-data-api` Worker and GitHub Pages v1.9 were not changed.
+
+**Next:** On the Cloudflare Pages v2 staging website, run a fresh **12-bearing 360-degree scan** of ASRN 1004233 and upload the new one-page 360 PDF to check the previously fixed tower-centered framing, omitted unrelated RX details, correct area, and the added DEM source resolution/project summary. The earlier 24/36-bearing scans passed *before* the latest provenance upgrade. The optional five-minute recovery behavior remains an acceptance item before final production release.
+
 ### Step 60 — uploaded one-page link PDF: provenance PASS, FCC coordinates NOT YET VERIFIED (October 29, 2026)
 
 The user uploaded `tower-horizon-manual-2026-10-29-point-to-point (3).pdf`, generated at 3:13:06 PM. Direct PDF visual/render review confirms **one US Letter page**, the two endpoint cards, 30-degree orientation-sector map, line-of-sight elevation profile, and new USGS source details. PDF values: `72 verified samples`, `USGS DEM raster resolution: 1 m (72)`, `USGS source projects: MA_CentralEastern_2021_B21`, and `~743 ft apart` (consistent with 9.99-mile path divided into 71 intervals). It reports `OBSTRUCTED`, `min clearance -22.4 ft`, TX elevation 188.9 ft AMSL, and 6-ft AGL Boston RX. No clipping or pagination defects were observed in the rendered page; bottom disclaimer/footer is slightly tight but legible.

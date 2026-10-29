@@ -6,6 +6,9 @@
  */
 (function terrainExports() {
   "use strict";
+  // Exact meters in an international statute mile. Used to report the
+  // spacing between terrain samples, NOT source raster resolution.
+  const MI = 1609.344;
   const $ = id => document.getElementById(id);
   const fmt = (n, digits = 1) => Number.isFinite(n)
     ? n.toLocaleString("en-US", { maximumFractionDigits: digits }) : "Not available";

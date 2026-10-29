@@ -97,6 +97,12 @@ The user tested production version `d01a0284-f058-47f2-97d2-e222023f7399` using 
 - **Front-end mitigation committed** to both `feature/terrain-v2-usgs` and `staging/terrain-v2`: point-to-point calls `POST /terrain/multipoint` instead of `/terrain/profile`, demanding exactly the requested geolocated elevations, including both endpoints. Missing values, invalid order, and any legacy polyline fallback are rejected; no PDF report is enabled on failure. The `/terrain/profile` Worker endpoint is retained for API compatibility; it no longer powers point-to-point analysis in the updated frontend.
 - **72-sample production multipoint test: PASS** (user-confirmed on 2026-10-29), using the exact Needham FCC coordinates and Boston receiver. No missing elevations reported. **Next gate:** refresh Cloudflare Pages staging, rerun Needham/Boston point-to-point analysis using the newly updated 72-point multipoint path, then visually inspect the resulting PDF. Keep live website v1.9 and the deployed production Worker unchanged until acceptance.
 
+### Hosted 24-bearing 360-degree scan — October 29, 2026
+
+The user tested the live Cloudflare Pages staging site with the Needham tower, 24 bearings and 48 USGS 3DEP multipoint samples per bearing. **First run:** one bearing failed after a temporary USGS HTTP 502, even after automatic retry 2 of 2. **Second run:** all 24 bearings completed, with 24 multipoint and 0 legacy radial queries, 23 profiles reused from cache, 40 range rings, and estimated terrain-visible area **5,906 mi²** inside a **51.9 mi** theoretical horizon. The supplied screenshot shows green/red terrain overlay and a dashed blue horizon.
+
+**Acceptance:** 24-bearing completion and reuse of previously successful terrain profiles after a transient failure are verified. This is **not** proof that the optional five-minute separate-window recovery process works; that remains an outstanding acceptance test. Likewise, the one-page 360 PDF for this run has not been separately inspected. Do not infer that an unknown sector was plotted correctly in the first incomplete scan without first-run evidence. Next: 36-bearing scan, one-page 360 PDF inspection, and five-minute recovery QA before live website release.
+
 ## Test and release record
 
 - Existing staging Worker multipoint handler: manually deployed and validated, 12/12 bearings achieved on a repeated 12-bearing USGS test.

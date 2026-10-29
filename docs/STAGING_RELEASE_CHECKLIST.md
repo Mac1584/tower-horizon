@@ -87,6 +87,14 @@ Production Worker `tower-data-api` was deployed as version `d01a0284-f058-47f2-9
 
 **Not yet verified against production:** `POST /terrain/profile`, `POST /terrain/multipoint`, production-origin browser CORS, 24/36-bearing scans, and a real five-minute recovery test. Do not merge Version 2.0 into the live frontend until these gates are reviewed.
 
+### Production USGS POST check — October 29, 2026
+
+The user tested production version `d01a0284-f058-47f2-97d2-e222023f7399` using precise FCC ASRN `1004233` TX coordinates `42.30297222,-71.21802778` and Boston RX `42.3601,-71.0589`, requesting 48 samples:
+
+- `POST /terrain/multipoint`: `sampleMethod=multipoint`, `requestedCount=48`, `returnedCount=48`, `complete=true`, empty `missingIndices`. **PASS.**
+- `POST /terrain/profile`: `source=USGS 3DEP`, `sampleCount=49`, `complete=false`, `endpointAdded=true`, `missingSampleIds=[47]`. The appended receiver locationId `49` has `exactEndpoint=true`, location `(-71.0589,42.3601)` and elevation `10.126227379` meters. **PARTIAL: endpoint verified, but original USGS polyline sample ID 47 is absent.**
+- Do **not** describe the polyline path as complete based solely on the appended endpoint; inspect sample spacing and repeat with another sample count to determine whether the omission creates a significant spatial gap. Keep live website v1.9 and production Worker version/rollback unchanged pending acceptance.
+
 ## Test and release record
 
 - Existing staging Worker multipoint handler: manually deployed and validated, 12/12 bearings achieved on a repeated 12-bearing USGS test.

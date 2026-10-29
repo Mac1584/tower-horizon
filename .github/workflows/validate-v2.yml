@@ -27,6 +27,8 @@ jobs:
         run: node tests/check-static.mjs
       - name: Reject missing samples in point-to-point multipoint analysis
         run: node tests/check-point-to-point.mjs
+      - name: Verify DEM provenance reporting and missing-source fallbacks
+        run: node tests/check-terrain-sources.mjs
       - name: Validate staging terrain URL
         if: github.ref_name == 'staging/terrain-v2'
         run: node tests/check-static.mjs --staging

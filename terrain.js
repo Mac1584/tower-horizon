@@ -5,7 +5,7 @@
   const R = 6371000, FT = 3.280839895, MI = 1609.344, RAD = Math.PI / 180;
   const ELEVATION_API = "https://epqs.nationalmap.gov/v1/json";
   const SAMPLES_API = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples";
-  const TOWER_API = "https://tower-data-api.mac1584.workers.dev";
+  const TOWER_API = "https://tower-terrain-staging.mac1584.workers.dev";
   const fmt = (n, d = 1) => Number.isFinite(n) ? n.toLocaleString("en-US", { maximumFractionDigits: d }) : "—";
   let map = null, towerMarker = null, receiverMarker = null, horizonCircle = null;
   let visibilityLayer = null, lastTxElevation = null, currentProfile = null, coverageRun = 0, analysisCounter = 0;

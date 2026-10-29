@@ -131,7 +131,7 @@
   // Leaflet's SVG layer. We use a FRESH canvas because html2canvas can leave
   // a transformed/filtered/clipped 2D context after painting its tiles. Drawing
   // on that original context can put all polygons outside the image.
-  function drawCoverageOverlay(ctx, canvas, map, scan) {
+  function drawCoverageOverlay(ctx, canvas, map, scan, includeReceiver = true) {
     if (!scan?.cells?.length) return 0;
     const originalSize = map.getSize();
     if (!(originalSize.x > 0 && originalSize.y > 0))
@@ -203,13 +203,13 @@
     }
     dot(tx, "TX", "#193b58", Math.max(5, 5 * sx));
     const rxLat = Number(val("terrainRxLat")), rxLon = Number(val("terrainRxLon"));
-    if (Number.isFinite(rxLat) && Number.isFinite(rxLon))
+    if (includeReceiver && Number.isFinite(rxLat) && Number.isFinite(rxLon))
       dot(toPx({lat:rxLat,lon:rxLon}), "RX", "#b58c28", Math.max(4, 4 * sx));
     ctx.restore();
     return drawn;
   }
 
-  function mapVectorFallback(map) {
+  function mapVectorFallback(map, includeReceiver = true) {
     const scan = coverage();
     const element = $("terrainMap");
     const canvas = document.createElement("canvas");
@@ -230,7 +230,7 @@
     for (let y = 0; y < height; y += 60) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
     }
-    const drawn = drawCoverageOverlay(ctx, canvas, map, scan);
+    const drawn = drawCoverageOverlay(ctx, canvas, map, scan, includeReceiver);
     if (scan?.cells?.length && !drawn)
       throw new Error("Coverage is outside the current map view. Center the map on the transmitter and export again.");
     ctx.fillStyle = "#ffffff";
@@ -241,11 +241,26 @@
     return canvas;
   }
 
-  async function captureMap() {
+  async function captureMap(options = {}) {
     const map = dataSource()?.getMap();
     if (!map) throw new Error("Map is not available. Reload the page and try again.");
     const target = $("terrainMap");
     const scan = coverage();
+    const reportFocused = options.focusCoverage === true && !!scan?.radiusM;
+    const previousView = reportFocused ? {center:map.getCenter(),zoom:map.getZoom()} : null;
+    try {
+      if (reportFocused) {
+        // A 360 report frames only its transmitter-centered coverage circle,
+        // never an unrelated receiver or a prior user-panned map position.
+        const latitudeDegrees = scan.radiusM / 6371000 * 180 / Math.PI;
+        const longitudeDegrees = latitudeDegrees /
+          Math.max(.01,Math.cos(scan.tx.lat * Math.PI / 180));
+        map.fitBounds([
+          [Math.max(-89.999,scan.tx.lat - latitudeDegrees),scan.tx.lon - longitudeDegrees],
+          [Math.min(89.999,scan.tx.lat + latitudeDegrees),scan.tx.lon + longitudeDegrees]
+        ], {padding:[25,25],animate:false});
+        await new Promise(resolve=>setTimeout(resolve,1100));
+      }
     if (typeof window.html2canvas === "function") {
       try {
         // Capture displayed map tiles, but do not rely on html2canvas to
@@ -257,6 +272,10 @@
           onclone: clonedDocument => {
             const pane = clonedDocument.querySelector("#terrainMap .leaflet-overlay-pane");
             if (pane) pane.style.opacity = "0";
+            if (reportFocused) {
+              const markers = clonedDocument.querySelector("#terrainMap .leaflet-marker-pane");
+              if (markers) markers.style.opacity = "0";
+            }
           }
         });
         if (screenshot.width && screenshot.height) {
@@ -269,7 +288,7 @@
           // This is essential: never paint overlay geometry directly on the
           // returned html2canvas context, which can retain a scaled transform.
           ctx.drawImage(screenshot, 0, 0);
-          const drawn = drawCoverageOverlay(ctx, canvas, map, scan);
+          const drawn = drawCoverageOverlay(ctx, canvas, map, scan, !reportFocused);
           if (scan?.cells?.length && !drawn) {
             throw new Error("The current map view contains no visible coverage cells. Center the map on the transmitter and try again.");
           }
@@ -285,9 +304,13 @@
         console.warn("Could not composite map tiles and coverage; rendering a schematic instead:", error);
       }
     }
-    const schematic = mapVectorFallback(map);
+    const schematic = mapVectorFallback(map, !reportFocused);
     return { canvas: schematic, fallback: true,
       polygonsDrawn: scan?.cells?.length || 0 };
+    } finally {
+      if (previousView)
+        map.setView(previousView.center,previousView.zoom,{animate:false});
+    }
   }
 
   function canvasDownload(canvas, fileName, quality = .92) {
@@ -512,8 +535,7 @@
 
   async function onePageReport() {
     await ensurePdfLibrary();
-    const result = await captureMap();
-    const chart = await chartImage().catch(err => { console.warn(err);return null; });
+    const result = await captureMap({focusCoverage:true});
     const scan = coverage();
     const doc = pdf("portrait");
     // This report is always a single 612 x 792 pt US Letter page.
@@ -525,14 +547,18 @@
     labelValue(doc,"Location",val("location") || "Manual coordinates",40,104,235);
     labelValue(doc,"ASRN",val("asrn") || "Manual site",330,104,220);
     labelValue(doc,"TX coordinates",point("terrainTxLat","terrainTxLon"),40,139,240);
-    labelValue(doc,"RX coordinates",point("terrainRxLat","terrainRxLon"),330,139,230);
+    labelValue(doc,"Radial sampling",scan ?
+      scan.samplesPerBearing + " points, ~" +
+      fmt(scan.radiusM / MI / Math.max(1,scan.samplesPerBearing-1),2) +
+      " mi apart" : "Not analyzed",330,139,230);
 
     const top = 176;
     const boxW = 178;
     const cards = [
       {label:"RADIO HORIZON",value:display("radioHorizon")},
       {label:"GEOMETRIC HORIZON",value:display("geometricHorizon")},
-      {label:"TERRAIN VISIBLE AREA",value:scan?.complete ? display("terrainArea") : "Incomplete / not run"}
+      {label:"TERRAIN VISIBLE AREA",value:scan?.complete ?
+        fmt(scan.terrainVisibleAreaSqMi,0) + " sq mi" : "Incomplete / not run"}
     ];
     cards.forEach((card,i)=>{
       const x=30+i*187;
@@ -548,20 +574,25 @@
     drawImageContained(doc,result.canvas,33,255,546,230);
 
     doc.setTextColor(25,59,88);doc.setFont("helvetica","bold");doc.setFontSize(10);
-    doc.text(chart ? "COVERAGE TEST RESULTS & ELEVATION PROFILE" :
-      "COVERAGE TEST RESULTS",30,507);
-    drawCoverageDiagnostics(doc,scan,chart);
+    doc.text("COVERAGE TEST RESULTS",30,507);
+    drawCoverageDiagnostics(doc,scan,null);
 
     doc.setDrawColor(181,191,198);doc.line(30,657,582,657);
     doc.setTextColor(25,59,88);doc.setFont("helvetica","bold");doc.setFontSize(9);
     doc.text("ENGINEERING INPUTS AND RESULTS",30,673);
     doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(64,81,91);
-    const first = "TX center: " + (val("radCenter") || "?") + " ft AGL  |  RX: " +
-      (val("receiverHeight") || "?") + " ft AGL  |  Base: " +
-      (val("baseElevation") || "?") + " ft AMSL  |  k=" + (val("terrainK") || "?");
-    const second = "Path: " + display("terrainResult") + "  |  Min clearance: " +
-      display("pathClearance") + "  |  Terrain scan: " +
-      (scan ? scan.bearings + " bearings, " + scan.failedBearings + " failed, " + scan.unknownSectors + " gray sectors" : "Not run");
+    const k = Number(val("terrainK"));
+    const kLabel = Math.abs(k - 4 / 3) < .001 ? "4/3 (Standard RF)" :
+      Math.abs(k - 1) < .001 ? "1 (Geometric LoS)" : fmt(k,3);
+    const first = "TX center: " + (val("radCenter") || "?") +
+      " ft AGL  |  RX assumption: " + (val("receiverHeight") || "?") +
+      " ft AGL  |  Base: " + (val("baseElevation") || "?") +
+      " ft AMSL  |  k=" + kLabel;
+    const second = scan ? "Terrain scan: " +
+      (scan.bearings - scan.failedBearings) + "/" + scan.bearings +
+      " verified bearings  |  " + scan.rings +
+      " distance rings  |  " + scan.unknownSectors +
+      " unknown sectors" : "Terrain scan: Not run";
     doc.text(pdfText(first),30,687);
     const secondLines=doc.splitTextToSize(pdfText(second),550);
     doc.text(secondLines.slice(0,2),30,701);

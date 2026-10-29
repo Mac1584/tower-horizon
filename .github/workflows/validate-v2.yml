@@ -31,6 +31,8 @@ jobs:
         run: node tests/check-terrain-sources.mjs
       - name: Exercise 360-degree PDF generation with simulated terrain data
         run: node tests/check-360-pdf.mjs
+      - name: Verify USGS raster provenance survives actual 12-bearing scanning
+        run: node tests/check-360-provenance.mjs
       - name: Validate staging-only Worker endpoints and USGS metadata
         run: node tests/check-staging-worker.mjs
       - name: Validate staging terrain URL

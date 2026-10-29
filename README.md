@@ -3,7 +3,7 @@
 **USGS 3DEP terrain-aware radio-horizon and line-of-sight planning tool**  
 **VERSION 2.0 · STATUS: BETA** — Waypoint Utility Web
 
-[Live Version 1.9](https://mac1584.github.io/tower-horizon/) · [Version 2.0 draft pull request](https://github.com/Mac1584/tower-horizon/pull/1) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md) · [Staging release checklist](docs/STAGING_RELEASE_CHECKLIST.md)
+[Live Version 1.9](https://mac1584.github.io/tower-horizon/) · [Version 2.0 draft pull request](https://github.com/Mac1584/tower-horizon/pull/1) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md) · [Staging release checklist](docs/STAGING_RELEASE_CHECKLIST.md) · [Production Worker candidate and integration](docs/PRODUCTION_WORKER_INTEGRATION.md)
 
 > **Release-candidate status:** Version 2.0 is on the `feature/terrain-v2-usgs` branch. A separate `staging/terrain-v2` branch points terrain requests to the already deployed `tower-terrain-staging` Worker for Cloudflare Pages staging previews. The live GitHub Pages website remains v1.9, and the production FCC Worker is unchanged. The 360-degree map/PDF exports were tested in Chrome, but the newest point-to-point report and recovery flow still need browser acceptance testing. See [staging checklist](docs/STAGING_RELEASE_CHECKLIST.md).
 
@@ -133,6 +133,9 @@ This map is deliberately coarse. Boundary sectors, narrow valleys, ridges, build
 | `waypoint.css` | Shared dark-navy and gray Waypoint Utility Web visual system |
 | `worker-terrain-extension.js` | **Integration module only**; adds USGS/Census routes to existing Worker |
 | `cloudflare/staging-multipoint-handler.js` | New self-contained `/terrain/multipoint` route to append to the existing **staging** Worker |
+| `cloudflare/production-worker-v2-candidate.js` | **Not deployed:** single-file FCC-compatible Worker candidate with all three USGS endpoints and original env.DB binding |
+| `tests/check-worker-candidate.mjs` | Non-deploying mocked FCC/D1/USGS regression checks for the candidate |
+| `docs/PRODUCTION_WORKER_INTEGRATION.md` | D1 binding, version-URL validation, rollback, and guarded production rollout |
 | `docs/MULTIPOINT_STAGING_ROLLOUT.md` | Safe, staged deployment and PowerShell verification of multipoint sampling |
 | `docs/CLOUDFLARE_SETUP_SOP.md` | Step-by-step setup, validation, staging, deployment and rollback |
 | `docs/diagrams/architecture.svg` | System architecture diagram |

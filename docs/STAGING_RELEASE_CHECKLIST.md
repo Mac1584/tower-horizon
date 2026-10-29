@@ -103,6 +103,12 @@ The user tested the live Cloudflare Pages staging site with the Needham tower, 2
 
 **Acceptance:** 24-bearing completion and reuse of previously successful terrain profiles after a transient failure are verified. This is **not** proof that the optional five-minute separate-window recovery process works; that remains an outstanding acceptance test. Likewise, the one-page 360 PDF for this run has not been separately inspected. Do not infer that an unknown sector was plotted correctly in the first incomplete scan without first-run evidence. Next: 36-bearing scan, one-page 360 PDF inspection, and five-minute recovery QA before live website release.
 
+### Hosted 36-bearing scan and 360 PDF — October 29, 2026
+
+The user uploaded a one-page 360-degree PDF from a completed **36/36 bearing** Cloudflare staging run using FCC ASRN `1004233`. Results: **1,728 verified terrain positions**, **40 distance rings**, **0 unknown sectors**, **1,265 terrain-clear cells**, **175 terrain-blocked cells**, and estimated terrain-visible area **5,878 sq mi** within the **51.9-mile** radio horizon. The PDF page and colored green/red map overlay rendered correctly. Compared with the complete 24-bearing report (**5,906 sq mi**), the estimate differs by approximately 0.47%. This is internal convergence evidence, not measured model accuracy.
+
+The 36-bearing PDF exposed report-only presentation issues: it included old receiver coordinates far outside the 360-degree study and a marker at that unrelated receiver; the map framing wasted space; empty point-to-point results appeared, `mi^2` rendered as text, and k was shown to 13 decimal places. The `export.js` correction has been committed to feature and staging branches and has not altered backend calculations. **Fresh hosted 360 PDF visual QA is still required** after the staging Pages update. Source-resolution metadata is not yet retained in the 360 multipoint Worker; it should not be inferred from the 48-point radial sampling interval.
+
 ## Test and release record
 
 - Existing staging Worker multipoint handler: manually deployed and validated, 12/12 bearings achieved on a repeated 12-bearing USGS test.

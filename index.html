@@ -112,6 +112,10 @@
   <h2 class="wuw-panel-title" id="terrainTitle">USGS 3DEP — Terrain &amp; Line-of-Sight Analysis <span class="unit-tag">BETA</span></h2>
   <div class="wuw-panel-content">
     <p class="hint">USGS elevations are interpolated bare-earth estimates. This models terrain visibility, not received signal strength. Use actual antenna center AGL when known. FCC lookup or coordinate entry populates the transmitter location.</p>
+    <div class="terrain-purpose-banner">
+      <strong>TWO WAYS TO USE TOWER HORIZON</strong>
+      <p><b>360° site visibility:</b> explore terrain visibility around one location, whether for broadcast planning or other uses. <b>Two-way point-to-point:</b> examine the geometric terrain path between two sites and generate a dedicated link report.</p>
+    </div>
     <div class="terrain-controls">
       <div class="terrain-subpanel">
         <h3>1. Transmitter location &amp; elevation</h3>
@@ -122,7 +126,7 @@
         <div class="terrain-metrics"><div><span>Ground elevation</span><strong id="terrainGround">Not loaded</strong></div><div><span>Antenna center AMSL</span><strong id="terrainAMSL">—</strong></div></div>
       </div>
       <div class="terrain-subpanel">
-        <h3>2. Receiving location</h3>
+        <h3>2. Point-to-point receiving location</h3>
         <label for="terrainRxAddress">Street address (U.S. Census geocoder)</label>
         <div class="lookup-row"><input id="terrainRxAddress" placeholder="City Hall, Boston, MA (full address recommended)"><button id="geocodeReceiver" type="button">Find Address</button></div>
         <div class="input-grid"><div><label for="terrainRxLat">RX latitude</label><input id="terrainRxLat" type="number" step="any" value="42.3601"></div><div><label for="terrainRxLon">RX longitude</label><input id="terrainRxLon" type="number" step="any" value="-71.0589"></div></div>
@@ -131,6 +135,11 @@
         <button id="analyzePath" type="button">Analyze Selected Path</button>
         <p id="terrainPathStatus" class="status" role="status">Select a receiver and run the path analysis.</p>
         <div class="terrain-metrics"><div><span>Terrain path</span><strong id="terrainResult">—</strong></div><div><span>Minimum clearance</span><strong id="pathClearance">—</strong></div><div class="wide"><span>Additional height to clear sampled terrain (either endpoint)</span><strong id="requiredHeight">—</strong></div></div>
+        <div class="path-report-actions">
+          <p class="terrain-download-title">POINT-TO-POINT REPORT</p>
+          <button type="button" id="exportPathPdf" disabled>Download Two-way Link PDF</button>
+          <p class="hint">One-page Letter report with the two sites, path distance, compass bearing, geometric clearance, elevation profile, and one 30° sector centered on the link. The sector is visual context, not an antenna beamwidth or predicted coverage.</p>
+        </div>
       </div>
     </div>
     <h3>Elevation cross-section</h3><div class="terrain-chart-wrap"><svg id="terrainChart" viewBox="0 0 900 295" role="img" aria-label="Terrain profile; run a path analysis to populate" preserveAspectRatio="xMidYMid meet"></svg></div>

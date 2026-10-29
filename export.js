@@ -230,7 +230,9 @@
     for (let y = 0; y < height; y += 60) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
     }
-    drawCoverageOverlay(ctx, canvas, map, scan);
+    const drawn = drawCoverageOverlay(ctx, canvas, map, scan);
+    if (scan?.cells?.length && !drawn)
+      throw new Error("Coverage is outside the current map view. Center the map on the transmitter and export again.");
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, height - 42, width, 42);
     ctx.fillStyle = "#52616b";
@@ -283,7 +285,8 @@
         console.warn("Could not composite map tiles and coverage; rendering a schematic instead:", error);
       }
     }
-    return { canvas: mapVectorFallback(map), fallback: true,
+    const schematic = mapVectorFallback(map);
+    return { canvas: schematic, fallback: true,
       polygonsDrawn: scan?.cells?.length || 0 };
   }
 
@@ -400,7 +403,9 @@
     doc.save(safeName("-map.pdf"));
     setStatus(result.fallback
       ? "Map PDF downloaded using schematic terrain overlay because background tiles could not be exported."
-      : "Map PDF downloaded (US Letter landscape, one page).");
+      : "Map PDF downloaded (US Letter landscape, one page)." +
+        (coverage() ? " Terrain cells rendered: " + result.polygonsDrawn + "." :
+          " No 360-degree scan has been run."));
   }
   function labelValue(doc, label, value, x, y, maxWidth) {
     doc.setTextColor(79,97,109);doc.setFont("helvetica","normal");doc.setFontSize(8);
@@ -570,6 +575,8 @@
     doc.save(safeName("-one-page-report.pdf"));
     setStatus("One-page US Letter PDF report downloaded." +
       (scan?.complete === false ? " The report flags incomplete terrain coverage." : "") +
+      (scan ? " Terrain cells rendered: " + result.polygonsDrawn + "." :
+        " No 360-degree scan has been run.") +
       (result.fallback ? " Map tiles were replaced by a schematic overlay." : ""));
   }
   async function runExport(buttonId, action) {

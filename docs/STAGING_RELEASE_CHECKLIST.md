@@ -77,6 +77,16 @@ The current production FCC Worker is `tower-data-api.mac1584.workers.dev`. Befor
 
 Worker version URLs: https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/
 
+## Live production backend verification — October 29, 2026
+
+Production Worker `tower-data-api` was deployed as version `d01a0284-f058-47f2-97d2-e222023f7399`. Rollback version: `e9e5d798-1b9f-459b-a910-36090a0aeceb`. The user verified the following three **read-only live GET tests**:
+
+- `GET /`: Worker status `running` and `databaseBindingConfigured: true`.
+- `GET /tower?asrn=1004233`: successful unchanged FCC record, including Needham, MA coordinates **42.30297222, -71.21802778**, tower height 1200.8 ft, estimated radiation center 1174.5 ft, and base elevation 150.9 ft.
+- `GET /terrain/elevation?lat=42.29&lon=-71.23`: USGS EPQS `elevationMeters: 57.576194763` (`elevationFeet: 188.9`). **These are example coordinates, not the exact FCC ASRN coordinates.**
+
+**Not yet verified against production:** `POST /terrain/profile`, `POST /terrain/multipoint`, production-origin browser CORS, 24/36-bearing scans, and a real five-minute recovery test. Do not merge Version 2.0 into the live frontend until these gates are reviewed.
+
 ## Test and release record
 
 - Existing staging Worker multipoint handler: manually deployed and validated, 12/12 bearings achieved on a repeated 12-bearing USGS test.

@@ -313,6 +313,7 @@
   function invalidateTerrain() {
     stopTerrainRecovery("Inputs changed; recovery session cancelled.");
     currentProfile = null;
+    window.dispatchEvent(new Event("towerPathCleared"));
     coverageSnapshot = null;
     window.dispatchEvent(new Event("towerCoverageCleared"));
     coverageRun++;
@@ -370,14 +371,23 @@
     if (![txAgl, rxAgl].every(v => Number.isFinite(v) && v >= 0))
       return status("terrainPathStatus", "Enter valid nonnegative antenna and receiver heights in the main calculator.", true);
     $("analyzePath").disabled = true;
+    currentProfile = null;
+    window.dispatchEvent(new Event("towerPathCleared"));
     status("terrainPathStatus", "Sampling the USGS terrain profile…");
     const runId = ++analysisCounter;
     try {
       const samples = await getProfile(tx, rx, Number($("terrainSamples").value));
       if (runId !== analysisCounter) return;
-      const result = analyze(samples, txAgl, rxAgl, k);
+      const result = {
+        ...analyze(samples, txAgl, rxAgl, k),
+        tx: { ...tx }, rx: { ...rx },
+        txAglFt: txAgl * FT, rxAglFt: rxAgl * FT,
+        k, samplesRequested: Number($("terrainSamples").value),
+        sampledAt: new Date().toISOString()
+      };
       currentProfile = result;
       drawProfile(result);
+      window.dispatchEvent(new Event("towerPathUpdated"));
       $("terrainResult").textContent = result.clear ? "TERRAIN CLEAR" : "OBSTRUCTED";
       $("terrainResult").className = result.clear ? "terrain-ok" : "terrain-blocked";
       $("pathClearance").textContent = fmt(result.minimum * FT) + " ft";

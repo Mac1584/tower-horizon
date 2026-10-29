@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tower Horizon | Five-minute terrain recovery</title>
+  <link rel="stylesheet" href="waypoint.css">
+  <style>
+    body{min-width:0;background:#e3e7ea;color:#25323a;font:13px/1.5 Arial,sans-serif;margin:0}
+    header{background:#193b58;color:white;padding:16px 20px;border-bottom:4px solid #b99a38}
+    header h1{font:bold 19px/1.2 Arial,sans-serif;margin:4px 0 0;color:white}
+    header p{margin:0;font-size:10px;letter-spacing:.08em;color:#cbd7de}
+    main{padding:18px 20px;max-width:700px;margin:auto}
+    .panel{background:#f7f8f9;border:1px solid #89949d;padding:16px;margin-bottom:13px}
+    .panel h2{background:#d1d6da;color:#193b58;font:bold 12px Arial,sans-serif;margin:-16px -16px 13px;padding:9px 12px;border-bottom:1px solid #89949d}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+    .stat{background:white;border:1px solid #89949d;padding:9px}
+    .stat strong{font-size:24px;color:#193b58;display:block}
+    .stat span{font-size:11px;color:#52616b}
+    .bar{height:9px;background:#cfd6db;border:1px solid #89949d;margin:15px 0 7px}
+    .bar>div{height:100%;background:#356641;width:0;transition:width .2s}
+    .status{color:#25323a;font-size:12px;font-weight:bold}
+    #log{font:11px/1.6 Consolas,monospace;color:#25323a;max-height:220px;overflow:auto;padding-left:20px}
+    #log li{padding:3px 0;border-bottom:1px solid #dfe3e6}
+    .hint{font-size:11px;color:#52616b}
+    button{background:#193b58;color:white;border:1px solid #102b41;padding:9px 14px;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.6;cursor:default}
+    .danger{color:#9c332e}
+    @media(max-width:460px){main{padding:12px}.stats{gap:5px}.stat{padding:6px}.stat strong{font-size:20px}}
+  </style>
+  <script src="recovery.js" defer></script>
+</head>
+<body>
+  <header><p>WAYPOINT UTILITY WEB · VERSION 2.0 · BETA</p><h1>USGS terrain recovery</h1></header>
+  <main>
+    <div class="panel" role="region" aria-labelledby="overview">
+      <h2 id="overview">OPTIONAL RECOVERY | MAXIMUM FIVE MINUTES</h2>
+      <p>Only bearings that failed because of a temporary service or network problem will be retried. Every successful profile is verified again in the original calculator before the map is updated.</p>
+      <div class="stats">
+        <div class="stat"><strong id="timeLeft">5:00</strong><span>Time remaining</span></div>
+        <div class="stat"><strong id="recovered">0</strong><span>Recovered</span></div>
+        <div class="stat"><strong id="outstanding">—</strong><span>Pending bearings</span></div>
+      </div>
+      <div class="bar" role="progressbar" aria-label="Recovered bearings" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress"><div id="progressFill"></div></div>
+      <p class="status" id="status" role="status" aria-live="polite">Connecting to the original calculator…</p>
+      <button type="button" id="stopRecovery">Stop retries</button>
+      <p class="hint">Keep the original calculator open. The five-minute limit applies only while this recovery window stays open. Closing this window also stops recovery.</p>
+    </div>
+    <div class="panel"><h2>REQUEST LOG</h2><ol id="log" aria-label="Recovery request history"></ol></div>
+    <p class="hint">Data: USGS 3DEP via the existing Cloudflare Worker. No new elevation provider is used. Missing or invalid terrain data remains unknown; no results are invented.</p>
+  </main>
+</body>
+</html>

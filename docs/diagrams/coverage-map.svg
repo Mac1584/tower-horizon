@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="475" viewBox="0 0 940 475" role="img" aria-labelledby="title desc">
+<title id="title">Illustrative 360 degree terrain visibility map</title>
+<desc id="desc">A circle around a tower location is subdivided into radial sectors. Some green sectors are visible and some red sectors are terrain-blocked. The blue dashed outer circle shows the theoretical radio horizon. This is schematic and not the output of a real USGS computation.</desc>
+<rect width="940" height="475" fill="#e6eaed"/><rect x="12" y="12" width="916" height="48" fill="#193b58"/>
+<text x="28" y="43" font-size="20" fill="white" font-family="Arial,sans-serif" font-weight="bold">360° TERRAIN VISIBILITY</text><text x="740" y="40" font-size="12" fill="#ffe29b" font-family="Arial,sans-serif">ILLUSTRATIVE MAP</text>
+<rect x="20" y="75" width="650" height="378" fill="#e6ede7" stroke="#89949d"/>
+<g stroke="#c6d3ca" stroke-width="1.5" fill="none"><path d="M20 124Q134 67 259 122T497 109T670 131"/><path d="M20 152Q133 93 259 151T497 138T670 160"/><path d="M20 296Q117 252 245 302T487 276T670 320"/><path d="M20 327Q117 280 245 331T487 305T670 349"/><path d="M54 75Q38 174 63 262T44 453"/><path d="M616 75Q595 171 631 265T609 453"/></g>
+<defs><clipPath id="h"><circle cx="341" cy="268" r="176"/></clipPath></defs>
+<g clip-path="url(#h)" opacity=".75">
+<circle cx="341" cy="268" r="176" fill="#d8e7d9"/>
+<path d="M341 268L300 92Q230 96 182 150L242 220L166 290L212 403L318 443Z" fill="#76b789"/>
+<path d="M341 268L390 99Q479 125 508 209L431 241L472 305L389 432L330 436Z" fill="#5aa575"/>
+<path d="M341 268L501 195Q530 258 487 341L410 286L397 386L341 441Z" fill="#c47467"/>
+<path d="M341 268L184 156Q151 193 164 289L254 284L201 370L315 444Z" fill="#c47467"/>
+<path d="M341 268L301 96L375 96L390 99L341 268Z" fill="#d6dfbf"/>
+<path d="M341 268L439 131L487 167L501 195Z" fill="#d6dfbf"/>
+<g stroke="#93a7a0" stroke-width=".8" fill="none" opacity=".7"><circle cx="341" cy="268" r="44"/><circle cx="341" cy="268" r="88"/><circle cx="341" cy="268" r="132"/><path d="M165 268H517M341 92V444M216 143L466 393M216 393L466 143"/></g>
+</g>
+<circle cx="341" cy="268" r="176" fill="none" stroke="#245c88" stroke-width="3" stroke-dasharray="9 6"/>
+<circle cx="341" cy="268" r="8" fill="#193b58" stroke="white" stroke-width="3"/>
+<text x="353" y="262" font-size="15" font-weight="bold" fill="#193b58" font-family="Arial,sans-serif">TX</text>
+<rect x="687" y="89" width="234" height="282" fill="#f7f8f9" stroke="#89949d"/>
+<text x="702" y="117" font-size="17" font-weight="bold" fill="#193b58" font-family="Arial,sans-serif">LEGEND</text>
+<rect x="703" y="139" width="23" height="14" fill="#76b789"/><text x="737" y="151" font-size="13" fill="#25323a" font-family="Arial,sans-serif">Mostly terrain-clear</text>
+<rect x="703" y="173" width="23" height="14" fill="#c47467"/><text x="737" y="185" font-size="13" fill="#25323a" font-family="Arial,sans-serif">Mostly blocked</text>
+<path d="M702 215H732" stroke="#245c88" stroke-width="3" stroke-dasharray="7 4"/><text x="740" y="220" font-size="13" fill="#25323a" font-family="Arial,sans-serif">Smooth-Earth</text><text x="740" y="236" font-size="13" fill="#25323a" font-family="Arial,sans-serif">horizon limit</text>
+<text x="702" y="273" font-size="13" font-weight="bold" fill="#193b58" font-family="Arial,sans-serif">METHOD</text>
+<text x="702" y="296" font-size="12" fill="#52616b" font-family="Arial,sans-serif">Radial sampling:</text>
+<text x="702" y="315" font-size="12" fill="#52616b" font-family="Arial,sans-serif">12 / 24 / 36 bearings</text>
+<text x="702" y="337" font-size="12" fill="#52616b" font-family="Arial,sans-serif">40 distance rings</text>
+<rect x="687" y="389" width="234" height="64" fill="#fff3c1" stroke="#b5a565"/><text x="703" y="412" font-size="12" font-weight="bold" fill="#654e15" font-family="Arial,sans-serif">NOT AN RF COVERAGE</text><text x="703" y="429" font-size="12" font-weight="bold" fill="#654e15" font-family="Arial,sans-serif">OR SERVICE CONTOUR</text>
+</svg>

@@ -7,6 +7,12 @@
 
 > **Release-candidate status (Oct 29, 2026):** Version 2.0 is on `feature/terrain-v2-usgs`. `staging/terrain-v2` powers the Cloudflare Pages preview and uses the separate `tower-terrain-staging` Worker. **The GitHub Pages website remains v1.9**, but the existing production `tower-data-api` Worker has been upgraded with the three USGS terrain endpoints (deployed version `d01a0284-f058-47f2-97d2-e222023f7399`; rollback version `e9e5d798-1b9f-459b-a910-36090a0aeceb`). Live FCC lookup, elevation and 48/48 multipoint checks passed; legacy polyline requests showed near-receiver omissions, so point-to-point analysis now requires complete verified multipoint sampling. Hosted 360-degree and point-to-point PDFs have been reviewed; 72-point multipoint, expanded radial and failure-recovery acceptance remain. See [staging checklist](docs/STAGING_RELEASE_CHECKLIST.md).
 
+## USGS elevation-source provenance (staging candidate)
+
+The Version 2.0 engineering PDFs can now include **reported USGS DEM raster resolution** and the underlying **raster/project name** (with acquisition year when explicitly supplied by the catalog), independently of the **calculator sample spacing**. The source-data summary can contain multiple resolutions/projects across a 360 scan. Missing source metadata is flagged as not reported and never alters geometric terrain calculations.
+
+This requires a new staging Worker deployment **before live acceptance**. The Cloudflare Pages staging frontend automatically receives code from `staging/terrain-v2`, but the existing `tower-terrain-staging` Worker must be updated manually using the complete [staging Worker provenance candidate](cloudflare/staging-worker-v2-provenance.js). The production `tower-data-api` Worker remains unchanged. See [USGS source provenance and staging rollout](docs/USGS_TERRAIN_PROVENANCE.md).
+
 ## Two primary use cases
 
 1. **360-degree site visibility:** sample terrain surrounding one transmitter or other reference location in 12, 24, or 36 directions; display clear, obstructed and unknown sector/ring cells; export CSV/KML/map images and a one-page PDF report. This workflow can support broadcast and nonbroadcast planning.

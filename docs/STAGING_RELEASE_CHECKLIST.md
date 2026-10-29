@@ -109,6 +109,24 @@ The user uploaded a one-page 360-degree PDF from a completed **36/36 bearing** C
 
 The 36-bearing PDF exposed report-only presentation issues: it included old receiver coordinates far outside the 360-degree study and a marker at that unrelated receiver; the map framing wasted space; empty point-to-point results appeared, `mi^2` rendered as text, and k was shown to 13 decimal places. The `export.js` correction has been committed to feature and staging branches and has not altered backend calculations. **Fresh hosted 360 PDF visual QA is still required** after the staging Pages update. Source-resolution metadata is not yet retained in the 360 multipoint Worker; it should not be inferred from the 48-point radial sampling interval.
 
+### DEM source provenance upgrade — prepared but NOT deployed (Oct 29, 2026)
+
+**Goal:** distinguish the reported resolution of the USGS raster (e.g. `resolution: 1`) from the calculator's 48-elevation/72-elevation sample spacing, and identify the underlying raster/project name and acquisition year if USGS supplies it. The user's raster `88413` resolved to `MA_CentralEastern_2021_B21`, `USGS_3DEP`, `DEM_Type: 1`; that catalog code is NOT a proven spatial resolution or a guaranteed lidar classifier.
+
+**Committed, nondeployed code:**
+- Staging Worker replacement: `cloudflare/staging-worker-v2-provenance.js`, which keeps elevation, profile, multipoint, and geocode plus adds `GET /terrain/catalog` and preserves `rasterId`, `resolution`, and optional source fields in multipoint samples.
+- Separate production FCC-compatible candidate: `cloudflare/production-worker-v2-candidate.js`, preserving `env.DB` and FCC `GET /tower` behavior. **Do not paste the staging-only file into production.**
+- `terrain.js`, `terrain-sources.js`, `export.js`, `path-report.js`, `index.html` now retain and summarize optional per-sample source provenance in both one-page PDF reports. DEM resolution, source raster/project, and calculator spacing are distinct.
+- Automated mocked checks: `node tests/check-worker-candidate.mjs`, `node tests/check-staging-worker.mjs`, `node tests/check-terrain-sources.mjs`, static and point-to-point regression. The feature-branch GitHub Actions run has passed.
+- Complete staging and follow-up production workflow: `docs/USGS_TERRAIN_PROVENANCE.md`.
+
+**Acceptance pending:**
+1. Back up currently deployed `tower-terrain-staging` source/version.
+2. Manually replace only that existing Worker with the complete staging-only candidate; verify 48/48 multipoint samples include `rasterId`/`resolution` where offered, and verify catalog name(s) for returned IDs.
+3. Hard-refresh Cloudflare Pages staging and generate fresh 12-bearing 360 and 72-point link PDFs; inspect source metadata, correct sample interval, one-page layout and centered coverage map.
+4. Evaluate temporary USGS catalog failure with terrain analysis still functional.
+5. Only after staging approval: consider a separate production Worker code deployment and live FCC regression; no merge to production GitHub Pages until all acceptance gates pass.
+
 ## Test and release record
 
 - Existing staging Worker multipoint handler: manually deployed and validated, 12/12 bearings achieved on a repeated 12-bearing USGS test.

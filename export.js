@@ -257,8 +257,58 @@
     .replace(/[\u2013\u2014]/g,"-").replace(/\u00b0/g, " deg")
     .replace(/\u00b2/g, "^2").replace(/\u00d7/g, "x")
     .replace(/[^\x20-\x7e]/g,"");
+  // jsPDF is normally preloaded from jsDelivr in index.html. If that CDN
+  // fails, recover on the user's PDF-export click using a different host.
+  let pdfLibraryPromise = null;
+  function loadPdfScript(url) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      let done = false;
+      const finish = (error) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        script.onload = script.onerror = null;
+        if (error) {
+          script.remove();
+          reject(error);
+        } else resolve();
+      };
+      script.src = url;
+      script.async = true;
+      script.onload = () => finish();
+      script.onerror = () => finish(new Error("Could not load " + new URL(url).hostname));
+      const timer = setTimeout(() => finish(new Error("Timed out loading PDF library")), 15000);
+      document.head.append(script);
+    });
+  }
+  async function ensurePdfLibrary() {
+    if (window.jspdf?.jsPDF) return;
+    if (!pdfLibraryPromise) {
+      pdfLibraryPromise = (async () => {
+        const candidates = [
+          "https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js",
+          "https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"
+        ];
+        for (const url of candidates) {
+          try {
+            await loadPdfScript(url);
+            if (window.jspdf?.jsPDF) return;
+          } catch (error) {
+            console.warn("PDF library fallback unavailable:", error);
+          }
+        }
+        throw new Error("PDF library unavailable from both CDN providers. Check browser extensions or network restrictions.");
+      })().catch(error => {
+        // A failed attempt can be retried later, without reloading the page.
+        pdfLibraryPromise = null;
+        throw error;
+      });
+    }
+    await pdfLibraryPromise;
+  }
   const pdf = (orientation = "portrait") => {
-    if (!window.jspdf?.jsPDF) throw new Error("PDF library could not load. Check your connection and try again.");
+    if (!window.jspdf?.jsPDF) throw new Error("PDF library is not available.");
     return new window.jspdf.jsPDF({orientation, unit:"pt", format:"letter", compress:true});
   };
   function pdfHeader(doc, title, sub, width) {
@@ -285,6 +335,7 @@
       : "JPEG map downloaded with the currently displayed map background and terrain overlay.");
   }
   async function mapPDF() {
+    await ensurePdfLibrary();
     const result = await captureMap();
     const doc = pdf("landscape");
     pdfHeader(doc,"360-degree terrain visibility map",
@@ -327,6 +378,7 @@
     } finally {URL.revokeObjectURL(src);}
   }
   async function onePageReport() {
+    await ensurePdfLibrary();
     const result = await captureMap();
     const chart = await chartImage().catch(err => { console.warn(err);return null; });
     const scan = coverage();

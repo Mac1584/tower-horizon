@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Script } from "node:vm";
 const root = fileURLToPath(new URL("../",import.meta.url));
 const read = file => readFileSync(join(root,file),"utf8");
-const files = ["script.js","terrain.js","export.js","path-report.js","recovery.js"];
+const files = ["script.js","terrain.js","terrain-sources.js","export.js","path-report.js","recovery.js"];
 const errors=[];
 for(const path of files){
  if(!existsSync(join(root,path))){errors.push("Missing "+path);continue;}

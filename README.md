@@ -3,9 +3,14 @@
 **USGS 3DEP terrain-aware radio-horizon and line-of-sight planning tool**  
 **VERSION 2.0 · STATUS: BETA** — Waypoint Utility Web
 
-[Live Version 1.9](https://mac1584.github.io/tower-horizon/) · [Version 2.0 draft pull request](https://github.com/Mac1584/tower-horizon/pull/1) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md)
+[Live Version 1.9](https://mac1584.github.io/tower-horizon/) · [Version 2.0 draft pull request](https://github.com/Mac1584/tower-horizon/pull/1) · [Cloudflare setup SOP](docs/CLOUDFLARE_SETUP_SOP.md) · [Staging release checklist](docs/STAGING_RELEASE_CHECKLIST.md)
 
-> **Development status:** Version 2.0 exists on the `feature/terrain-v2-usgs` branch. The existing production website and FCC Worker are not updated automatically. The Worker extension needs to be integrated into the original Worker source and validated before deployment. The transmitter elevation and single-path USGS calculations have been validated locally. The 360-degree scan is still beta. The multipoint endpoint has been deployed to the existing **staging** Worker and validated with a successful 12/12-bearing local run. Recovery-window features are implemented in the development branch but still need real-browser QA before any production rollout.
+> **Release-candidate status:** Version 2.0 is on the `feature/terrain-v2-usgs` branch. A separate `staging/terrain-v2` branch points terrain requests to the already deployed `tower-terrain-staging` Worker for Cloudflare Pages staging previews. The live GitHub Pages website remains v1.9, and the production FCC Worker is unchanged. The 360-degree map/PDF exports were tested in Chrome, but the newest point-to-point report and recovery flow still need browser acceptance testing. See [staging checklist](docs/STAGING_RELEASE_CHECKLIST.md).
+
+## Two primary use cases
+
+1. **360-degree site visibility:** sample terrain surrounding one transmitter or other reference location in 12, 24, or 36 directions; display clear, obstructed and unknown sector/ring cells; export CSV/KML/map images and a one-page PDF report. This workflow can support broadcast and nonbroadcast planning.
+2. **Point-to-point geometric connectivity:** test a specific link between two antenna locations with independent heights above ground. Measure the sampled terrain clearance, distance, bearings and elevation profile. **Download Two-way Link PDF** creates a separate one-page Letter report with a north-up map, the actual A-to-B path and **one 30-degree orientation sector centered on the path**. The context sector is *not* modeled coverage or antenna beamwidth; geometric clearance does not predict RF link reliability.
 
 ## Why this tool exists
 
@@ -118,7 +123,10 @@ This map is deliberately coarse. Boundary sectors, narrow valleys, ridges, build
 | `index.html` | Web app with original calculator and new terrain panels |
 | `script.js` | Existing smooth-Earth horizon math and FCC lookup; dispatches valid FCC coordinates |
 | `terrain.js` | USGS calls, address selection, path visibility, profile SVG chart, coarse 360-degree view and structured export snapshots |
-| `export.js` | CSV, KML, JPEG and PDF exports, including the US Letter one-page report |
+| `export.js` | CSV, KML, JPEG and PDF exports, including the 360-degree one-page report |
+| `path-report.js` | Independent one-page two-way point-to-point PDF with selected-path map, 30-degree orientation sector and a vector elevation chart |
+| `tests/check-static.mjs` | Dependency-free Node syntax and staging integration smoke checks |
+| `docs/STAGING_RELEASE_CHECKLIST.md` | Staging branch, Cloudflare Pages test hosting, acceptance and safeguarded production rollout |
 | `recovery.html` / `recovery.js` | Optional five-minute stand-alone same-origin retry window for transient terrain errors |
 | `docs/RABBITEARS_MAP_RESEARCH.md` | Public RabbitEars contour/Leaflet/SPLAT research notes for future map enhancements |
 | `style.css` | Calculator/terrain layouts, map and charts |
@@ -149,7 +157,8 @@ The 360-degree scan requests at most three USGS terrain profiles concurrently an
 - **CSV:** download the 360° radial profile samples, elevations, and per-ring line-of-sight classifications, with scan metadata and errors.
 - **KML:** export colored coverage polygons, including gray unknown sectors, for use with Google Earth and compatible applications. KML represents preliminary modeled terrain visibility, not FCC contour data.
 - **Map JPEG and Map PDF:** export the current displayed map. The browser first attempts to capture displayed tiles with html2canvas; where browser/cross-origin restrictions prevent this, it exports a clearly labeled schematic map with the actual overlay instead.
-- **One-page PDF report:** creates a native one-page **US Letter (8.5 × 11 in)** PDF with inputs, main results, map, and model limitations. It always includes a **coverage-test diagnostics panel** when a 360° scan exists; if a selected receiving path has also been analyzed, its elevation profile replaces the expanded breakdown but the scan summary remains. Reports identify unknown/incomplete terrain analysis. The map PDF includes the verified-bearing count, distance rings, area status and unknown-sector count.
+- **360-degree one-page PDF:** creates a one-page **US Letter (8.5 × 11 in)** report with transmitter inputs, terrain-visible area, map, and coverage-test diagnostics. Reports flag unknown/incomplete terrain analysis.
+- **Two-way Point-to-Point PDF:** after Analyze Selected Path, a separate one-page Letter report includes individual endpoint elevations/heights, distance, true bearings in both directions, minimum sampled clearance, height-adjustment options, a detailed elevation profile and a map containing **only one 30-degree orientation sector and the tested path** (no 360-degree overlay).
 
 The map-export renderer first captures OpenStreetMap tiles, then composites **verified scan-cell geometry on a new canvas**. This avoids a browser rendering problem in which html2canvas leaves transformations that make the terrain overlay invisible when painted on its original context. The PDF download status reports the number of terrain cells drawn. The exported terrain layer and dashed theoretical horizon are derived from the same scan data used by CSV/KML. Map image and PDF exports run in the browser and use pinned html2canvas 1.4.1 and jsPDF 2.5.2. jsPDF loads from the npm-backed jsDelivr URL, with an on-demand unpkg fallback if the initial CDN fails. No export uploads your data to a separate server. Map tiles remain subject to OpenStreetMap attribution and usage policy. Use caution: grayscale styling is a visual filter on the existing OSM raster tiles, not a separate map service.
 

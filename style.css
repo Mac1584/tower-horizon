@@ -129,3 +129,15 @@ h3 { color: #193b58; font-size: 12px; margin: 0 0 7px; }
 .terrain-recovery-option p{font-size:11px;line-height:1.6;margin:7px 0}
 .terrain-recovery-option button{min-height:36px}
 .terrain-recovery-option .status{font-weight:600}
+
+/* Two first-class analysis modes: 360-degree site visibility and
+   reciprocal two-endpoint terrain line-of-sight. */
+.terrain-purpose-banner{margin:10px 0 14px;border:1px solid #89949d;border-left:4px solid #356641;background:#edf1f3;padding:11px 13px;color:#25323a}
+.terrain-purpose-banner strong{display:block;color:#193b58;font-size:11px;letter-spacing:.05em}
+.terrain-purpose-banner p{margin:6px 0 0;font-size:11px;line-height:1.65}
+.terrain-purpose-banner b{color:#193b58}
+.path-report-actions{border:1px solid #89949d;background:#e7eeec;margin-top:15px;padding:11px 12px}
+.path-report-actions button{margin:0;font-size:12px;min-height:37px;background:#193b58}
+.path-report-actions button:hover{background:#285978}
+.path-report-actions .terrain-download-title{margin:0 0 7px}
+.path-report-actions .hint{margin:8px 0 0}

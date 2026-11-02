@@ -4,7 +4,7 @@
 
 **VERSION 2.0 · STATUS: BETA** · Waypoint Utility Web
 
-[Open the calculator](https://mac1584.github.io/tower-horizon/) · [Report an issue or suggest an improvement](https://github.com/Mac1584/tower-horizon/issues) · [Production release record](docs/PRODUCTION_RELEASE_2026-10-29.md)
+[Open the calculator](https://tower.inwoodtech.com/)· [Report an issue or suggest an improvement](https://github.com/Mac1584/tower-horizon/issues) · [Production release record](docs/PRODUCTION_RELEASE_2026-10-29.md)
 
 How far can that tower see? Enter a location and antenna heights to estimate the smooth-Earth horizon, explore surrounding terrain, or examine the geometric path between two sites.
 
@@ -24,7 +24,7 @@ The tool is built around U.S. FCC tower records, U.S. location helpers, and USGS
 
 ## Try it
 
-1. Open the [live calculator](https://mac1584.github.io/tower-horizon/). Enter coordinates, a complete U.S. street address, or a ZIP code and select **Locate**. Alternatively, enter an FCC ASRN such as **1004233** and select **Look Up FCC**.
+1. Open the [live calculator] (https://tower.inwoodtech.com/). Enter coordinates, a complete U.S. street address, or a ZIP code and select **Locate**. Alternatively, enter an FCC ASRN such as **1004233** and select **Look Up FCC**.
 2. Confirm the location and antenna heights. Use the actual antenna radiation center above ground when available. The automatic tower-top-minus-8-meters estimate is a convenience assumption.
 3. Choose a study:
 

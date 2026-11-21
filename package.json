@@ -1,0 +1,9 @@
+{
+  "name": "tower-horizon-checks",
+  "private": true,
+  "description": "Development checks only; GitHub Pages serves the static files directly.",
+  "scripts": {
+    "test:rf": "node tests/check-rf.mjs && node tests/check-rf-ui.mjs"
+  },
+  "devDependencies": {"jsdom": "29.0.1"}
+}

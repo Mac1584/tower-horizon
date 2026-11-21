@@ -407,7 +407,7 @@
   function pdfHeader(doc, title, sub, width) {
     doc.setFillColor(25,59,88);doc.rect(0,0,width,60,"F");
     doc.setTextColor(237,242,246);doc.setFont("helvetica","bold");doc.setFontSize(10);
-    doc.text("WAYPOINT UTILITY WEB  /  TOWER HORIZON 2.0",32,21);
+    doc.text("WAYPOINT UTILITY WEB  /  TOWER HORIZON 2.1",32,21);
     doc.setFontSize(17);doc.text(pdfText(title),32,45);
     doc.setTextColor(64,81,91);doc.setFont("helvetica","normal");doc.setFontSize(9);
     doc.text(pdfText(sub),32,76);

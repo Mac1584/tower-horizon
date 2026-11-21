@@ -322,6 +322,7 @@
     else $("terrainAMSL").textContent = "—";
   }
   function invalidateTerrain() {
+    analysisCounter++; // Cancel an in-flight path request as soon as its inputs change.
     stopTerrainRecovery("Inputs changed; recovery session cancelled.");
     currentProfile = null;
     window.dispatchEvent(new Event("towerPathCleared"));
@@ -906,11 +907,12 @@
     mainHeight.addEventListener("input", () => {
       terrainHeight.value = mainHeight.value;
     });
+    $("resetRadCenter").addEventListener("click", invalidateTerrain);
     $("radCenter").addEventListener("input", invalidateTerrain);
     $("towerHeight").addEventListener("input", invalidateTerrain);
     $("receiverHeight").addEventListener("input", invalidateTerrain);
-    ["terrainRxLat", "terrainRxLon", "terrainTxLat", "terrainTxLon", "terrainK", "terrainBearings"].forEach(id =>
-      $(id).addEventListener("change", () => {
+    ["terrainRxLat", "terrainRxLon", "terrainTxLat", "terrainTxLon", "terrainK", "terrainBearings", "terrainSamples"].forEach(id =>
+      $(id).addEventListener("input", () => {
         if (id === "terrainTxLat" || id === "terrainTxLon") {
           lastTxElevation = null;
           $("terrainGround").textContent = "Not loaded";

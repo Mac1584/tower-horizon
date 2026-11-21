@@ -141,3 +141,25 @@ h3 { color: #193b58; font-size: 12px; margin: 0 0 7px; }
 .path-report-actions button:hover{background:#285978}
 .path-report-actions .terrain-download-title{margin:0 0 7px}
 .path-report-actions .hint{margin:8px 0 0}
+
+/* RF 2.1: match the existing boxed engineering controls. */
+.rf-panel { margin-block: 20px; scroll-margin-top: 15px; }
+.rf-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.rf-grid > div, .rf-endpoints > fieldset { min-width: 0; }
+.rf-panel input, .rf-panel select { width: 100%; min-height: 44px; font-size: 1rem; }
+.rf-check { display: flex; align-items: center; gap: 9px; }
+.rf-check input { width: 22px; min-height: 22px; flex: 0 0 22px; }
+.rf-check label { margin: 0; }
+.rf-details { border: 1px solid #9aa7b0; background: #f1f3f4; padding: 12px; margin-block: 14px; }
+.rf-details summary { font-weight: bold; cursor: pointer; min-height: 24px; color: #193b58; }
+.rf-endpoints { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.rf-endpoints fieldset { border: 1px solid #8b9ba6; padding: 12px; }
+.rf-endpoints legend { font-weight: bold; color: #193b58; }
+.rf-results { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.rf-results .result { border: 1px solid #8b9ba6; border-top: 4px solid #3f7252; padding: 14px; background: #f4f6f7; }
+.rf-results strong, .rf-results small, .rf-results span { display: block; }
+.rf-results strong { font-size: 1.7rem; margin-block: 7px; color: #193b58; }
+.rf-panel input[aria-invalid="true"] { border: 2px solid #aa2d30; background: #fff2ef; }
+.rf-panel :focus-visible { outline: 3px solid #315d82; outline-offset: 2px; }
+@media (max-width: 760px) { .rf-grid, .rf-endpoints { grid-template-columns: 1fr; } }
+@media (max-width: 420px) { .rf-results { grid-template-columns: 1fr; } }

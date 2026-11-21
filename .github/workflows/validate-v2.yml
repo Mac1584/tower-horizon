@@ -3,6 +3,7 @@ name: Tower Horizon 2.0 static smoke check
 on:
   push:
     branches:
+      - feature/rf-v2.1
       - feature/terrain-v2-usgs
       - staging/terrain-v2
   pull_request:
@@ -23,6 +24,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install development test dependencies
+        run: npm ci --ignore-scripts
+      - name: Validate RF calculations, DOM workflows, and PDF content
+        run: npm run test:rf
       - name: Validate scripts, HTML wiring and assets
         run: node tests/check-static.mjs
       - name: Reject missing samples in point-to-point multipoint analysis

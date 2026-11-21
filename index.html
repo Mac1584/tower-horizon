@@ -3,28 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Estimate radio horizons, map terrain visibility, and check point-to-point line of sight using USGS 3DEP terrain data. Export maps and engineering reports.">
-  <title>Tower Horizon Calculator v2.0 — Waypoint Utility Web</title>
+  <meta name="description" content="Estimate radio horizons, assess USGS terrain visibility, and compare two-way frequency-aware RF budgets. Export terrain and RF reference reports.">
+  <title>Tower Horizon Calculator v2.1 — Waypoint Utility Web</title>
   <link rel="canonical" href="https://tower.inwoodtech.com/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Tower Horizon Calculator 2.0 | Waypoint Utility Web">
+  <meta property="og:title" content="Tower Horizon Calculator 2.1 | Waypoint Utility Web">
   <meta property="og:description" content="How far can that tower see? Explore radio horizons, 360° terrain visibility, and point-to-point line of sight with USGS terrain data and downloadable reports.">
   <meta property="og:url" content="https://tower.inwoodtech.com/">
   <meta property="og:site_name" content="Waypoint Utility Web">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Tower Horizon Calculator 2.0">
+  <meta name="twitter:title" content="Tower Horizon Calculator 2.1">
   <meta name="twitter:description" content="Radio horizons, terrain visibility, and point-to-point line of sight. Free preliminary planning tool with downloadable maps and reports.">
   <link rel="stylesheet" href="waypoint.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.1.0-beta.1">
   <link rel="stylesheet" href="vendor/leaflet-1.9.4.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
   <script src="script.js" defer></script>
-  <script src="terrain.js" defer></script>
+  <script src="terrain.js?v=2.1.0-beta.1" defer></script>
   <script src="terrain-sources.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" defer></script>
-  <script src="export.js" defer></script>
-  <script src="path-report.js" defer></script>
+  <script src="export.js?v=2.1.0-beta.1" defer></script>
+  <script src="rf.js?v=2.1.0-beta.1" defer></script>
+  <script src="rf-ui.js?v=2.1.0-beta.1" defer></script>
+  <script src="rf-report.js?v=2.1.0-beta.1" defer></script>
+  <script src="path-report.js?v=2.1.0-beta.1" defer></script>
 </head>
 <body>
   <a class="wuw-skip" href="#calculator">Skip to calculator</a>
@@ -34,11 +37,12 @@
       <h1 class="wuw-title">Tower Horizon Calculator</h1>
       <p class="wuw-subtitle">How far can that tower see? Antenna height, Earth's curvature, and the radio horizon.</p>
     </div>
-    <div class="wuw-meta"><span class="wuw-version">VERSION 2.0</span><span class="wuw-status beta">STATUS: BETA</span></div>
+    <div class="wuw-meta"><span class="wuw-version">VERSION 2.1</span><span class="wuw-status beta">STATUS: BETA</span></div>
   </header>
   <nav class="wuw-nav" aria-label="Tool navigation">
     <a class="active" href="#calculator"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM8 6h8M8 10h2M14 10h2M8 14h2M14 14h2M8 18h2M14 18h2"/></svg>Calculator</a>
     <a href="#terrain">Terrain</a>
+    <a href="#rf">RF Link</a>
     <a href="#method"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18M6 16l4-8 4 5 5-9M3 4v15"/></svg>Method</a>
     <a href="#sources"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7l1 2 1-2h7v15h-7l-1 2-1-2H4zM12 6v15M7 8h2M15 8h2M7 12h2M15 12h2"/></svg>Sources</a>
     <span class="wuw-nav-divider" aria-hidden="true"></span>
@@ -142,17 +146,54 @@
         <div class="lookup-row"><input id="terrainRxAddress" placeholder="City Hall, Boston, MA (full address recommended)"><button id="geocodeReceiver" type="button">Find Address</button></div>
         <div class="input-grid"><div><label for="terrainRxLat">RX latitude</label><input id="terrainRxLat" type="number" step="any" value="42.3601"></div><div><label for="terrainRxLon">RX longitude</label><input id="terrainRxLon" type="number" step="any" value="-71.0589"></div></div>
         <div class="terrain-height-link"><label for="terrainReceiverHeight">Receiver antenna height <span class="optional">ft AGL (above ground level)</span></label><input id="terrainReceiverHeight" type="number" min="0" step="any" value="6" aria-describedby="terrainReceiverHeightHelp"><p class="hint" id="terrainReceiverHeightHelp">Mirrors the Receiver height input in the calculator above. Changing either field updates the other automatically.</p></div><p class="hint">Or click the map to set the receiver location.</p>
-        <div class="input-grid"><div><label for="terrainK">Effective Earth-radius factor</label><select id="terrainK"><option value="1.3333333333333" selected>k = 4/3 (Standard RF)</option><option value="1">k = 1 (Geometric LoS)</option></select></div><div><label for="terrainSamples">Terrain samples per path</label><select id="terrainSamples"><option value="48">48 (fast)</option><option value="72" selected>72 (standard)</option><option value="120">120 (detailed)</option></select></div></div>
+        <div class="input-grid"><div><label for="terrainK">Effective Earth-radius factor</label><select id="terrainK"><option value="1.3333333333333" selected>k = 4/3 (Standard RF)</option><option value="1">k = 1 (Geometric LoS)</option><option value="0.6666666666667">k = 2/3 (Reduced refraction scenario)</option><option value="2">k = 2 (Enhanced refraction scenario)</option></select></div><div><label for="terrainSamples">Terrain samples per path</label><select id="terrainSamples"><option value="48">48 (fast)</option><option value="72" selected>72 (standard)</option><option value="120">120 (detailed)</option></select></div></div>
         <button id="analyzePath" type="button">Analyze Selected Path</button>
         <p id="terrainPathStatus" class="status" role="status">Select a receiver and run the path analysis.</p>
         <div class="terrain-metrics"><div><span>Terrain path</span><strong id="terrainResult">—</strong></div><div><span>Minimum clearance</span><strong id="pathClearance">—</strong></div><div class="wide"><span>Additional height to clear sampled terrain (either endpoint)</span><strong id="requiredHeight">—</strong></div></div>
         <div class="path-report-actions">
           <p class="terrain-download-title">POINT-TO-POINT REPORT</p>
           <button type="button" id="exportPathPdf" disabled>Download Two-way Link PDF</button>
-          <p class="hint">One-page Letter report with the two sites, path distance, compass bearing, geometric clearance, elevation profile, and one 30° sector centered on the link. The sector is visual context, not an antenna beamwidth or predicted coverage.</p>
+          <p class="hint">Two-page Letter report with both RF directions and the two sites, path distance, compass bearing, geometric clearance, elevation profile, and one 30° sector centered on the link. The sector is visual context, not an antenna beamwidth or predicted coverage.</p>
         </div>
       </div>
     </div>
+    <section id="rf" class="wuw-panel rf-panel" aria-labelledby="rfTitle">
+      <h2 class="wuw-panel-title" id="rfTitle">RF Link Reference <span class="unit-tag">VERSION 2.1 / BETA</span></h2>
+      <div class="wuw-panel-content">
+        <p>Compare free-space receiver-input power in both directions.  The height and terrain calculations above remain separate from this frequency-aware reference.</p>
+        <form id="rfForm" aria-labelledby="rfTitle" novalidate>
+          <div class="rf-grid">
+            <div><label for="rfPreset">Starting equipment preset</label><select id="rfPreset" name="preset"></select></div>
+            <div><label for="rfDistanceMode">Distance source</label><select id="rfDistanceMode" name="distanceMode"><option value="manual">Quick estimate: manual distance</option><option value="path">Selected terrain path</option></select></div>
+            <div><label for="rfDistance">Manual distance (miles, required)</label><input id="rfDistance" name="distance" type="number" min="0.000001" step="any" required value="10" aria-invalid="false"></div>
+            <div><label for="rfFrequency">A to B frequency (MHz, required)</label><input id="rfFrequency" name="frequency" type="number" min="0.000001" step="any" required value="2050" aria-invalid="false"></div>
+            <div><label for="rfEnvironment">Path environment (optional)</label><select id="rfEnvironment" name="environment"><option>Unspecified</option><option>Land</option><option>Freshwater</option><option>Saltwater</option><option>Mixed land / water</option></select></div>
+            <div class="rf-check"><input id="rfSeparateFrequency" name="separateFrequency" type="checkbox"><label for="rfSeparateFrequency">Use a different B to A frequency</label></div>
+            <div id="rfReverseWrap" hidden><label for="rfReverseFrequency">B to A frequency (MHz, required when enabled)</label><input id="rfReverseFrequency" name="reverseFrequency" type="number" min="0.000001" step="any" required value="2050" aria-invalid="false"></div>
+          </div>
+          <details class="rf-details"><summary>Equipment at each site (all values required)</summary>
+            <p class="hint">Power is conducted transmitter output.  Passive losses include feedline and connectors; receive power is after RX passive loss, before active gain or downconversion.  Gains are dBi, not dBd.</p>
+            <div class="rf-endpoints"><fieldset><legend>Site A / origin</legend><div id="rfEquipmentA" class="input-grid"></div></fieldset><fieldset><legend>Site B / remote</legend><div id="rfEquipmentB" class="input-grid"></div></fieldset></div>
+            <button id="rfResetPreset" type="button" class="secondary-button">Restore starting preset</button>
+          </details>
+          <p class="hint">Presets are editable planning examples, not verified installed equipment or channel assignments.  Non-ENG gains of 0 dBi are neutral placeholders.  Passive losses are design allowances.  Confirm actual frequency, power, antennas, and losses.</p>
+          <p id="rfStatus" class="hint"></p><p id="rfError" class="status error" role="status"></p>
+        </form>
+        <div class="rf-results" aria-label="Free-space results">
+          <div class="result"><span>A → B receiver input</span><strong id="rfAB">—</strong><small id="rfABLoss"></small></div>
+          <div class="result"><span>B → A receiver input</span><strong id="rfBA">—</strong><small id="rfBALoss"></small></div>
+        </div>
+        <p id="rfContext" class="hint"></p>
+        <button id="exportRfPdf" type="button">Download RF Reference PDF</button><p id="rfExportStatus" class="status" role="status"></p>
+        <details class="rf-details"><summary>Environment, refraction, and model limits</summary>
+          <p id="rfScenarios"></p>
+          <p>These k values are sensitivity assumptions, not weather forecasts.  Select a k value above and rerun the terrain path to assess its geometric effect.  Environment labels do not change the free-space power estimate.</p>
+          <p>Over-water reflection and atmospheric gradients can increase or reduce received signals.  A single temperature cannot determine refraction or evaporation ducting; temperature, humidity, pressure, and their changes with height matter.</p>
+          <p>This model excludes reflection, ducting, diffraction, Fresnel obstruction, rain, atmospheric absorption, foliage, buildings, interference, receiver thresholds, and fade margin.  An obstructed terrain path remains obstructed; the RF value is only a free-space reference.  No service coverage or duplex reliability is predicted.</p>
+          <p class="hint">Method: <a href="https://www.itu.int/rec/R-REC-P.525/">ITU-R P.525</a>.  Refraction context: <a href="https://www.itu.int/rec/R-REC-P.453/en">ITU-R P.453</a>.  <a href="docs/RF_V2_1.md">Preset assumptions and release notes</a>.</p>
+        </details>
+      </div>
+    </section>
     <h3>Elevation cross-section</h3><div class="terrain-chart-wrap"><svg id="terrainChart" viewBox="0 0 900 295" role="img" aria-label="Terrain profile; run a path analysis to populate" preserveAspectRatio="xMidYMid meet"></svg></div>
     <div class="terrain-subpanel terrain-coverage"><h3>3. 360° terrain-visibility map</h3>
       <div class="terrain-processing-notice" role="note" aria-label="Terrain scan processing notice">
@@ -199,6 +240,6 @@
       <div class="wuw-panel-content"><nav class="source-links" aria-label="Source links"><a href="https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistrationSearch.jsp" target="_blank" rel="noopener noreferrer">FCC ASR search</a><a href="https://www.fcc.gov/" target="_blank" rel="noopener noreferrer">FCC</a><a href="https://www.census.gov/" target="_blank" rel="noopener noreferrer">U.S. Census Bureau</a><a href="https://www.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a><a href="https://www.rabbitears.info/" target="_blank" rel="noopener noreferrer">RabbitEars ↗</a></nav><p class="hint">RabbitEars is linked as a courtesy. This independent calculator is not affiliated with or endorsed by RabbitEars, the FCC, the Census Bureau, or USGS. Educational estimates only.</p></div>
     </section>
   </main>
-  <footer class="wuw-footer"><strong>Waypoint Utility Web</strong><span>Tower Horizon Calculator · VERSION 2.0 · STATUS: BETA</span><span>Engineering estimates / field reference</span></footer>
+  <footer class="wuw-footer"><strong>Waypoint Utility Web</strong><span>Tower Horizon Calculator · VERSION 2.1 · STATUS: BETA</span><span>Engineering estimates / field reference</span></footer>
 </body>
 </html>

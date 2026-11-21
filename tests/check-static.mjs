@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Script } from "node:vm";
 const root = fileURLToPath(new URL("../",import.meta.url));
 const read = file => readFileSync(join(root,file),"utf8");
-const files = ["script.js","terrain.js","terrain-sources.js","export.js","path-report.js","recovery.js"];
+const files = ["script.js","terrain.js","terrain-sources.js","export.js","path-report.js","recovery.js","rf.js","rf-ui.js","rf-report.js"];
 const errors=[];
 for(const path of files){
  if(!existsSync(join(root,path))){errors.push("Missing "+path);continue;}
@@ -16,7 +16,7 @@ for(const path of files){
 const html = read("index.html");
 for(const name of files){
  if(name==="recovery.js") continue; // Loaded in its own recovery window.
- if(!html.includes('src="'+name+'"')) errors.push("index.html does not load "+name);
+ if(!new RegExp('src="'+name.replaceAll('.', '\\.')+'(?:\\?[^"]*)?"').test(html)) errors.push("index.html does not load "+name);
 }
 for(const id of ["exportReportPdf","exportMapPdf","exportPathPdf","terrainMap",
  "terrainTxLat","terrainTxLon","terrainRxLat","terrainRxLon",

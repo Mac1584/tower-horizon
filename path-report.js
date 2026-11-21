@@ -161,7 +161,7 @@
   function header(doc,title,subtitle) {
     doc.setFillColor(25,59,88);doc.rect(0,0,612,63,"F");
     doc.setTextColor(235,241,246);doc.setFont("helvetica","bold");
-    doc.setFontSize(10);doc.text("WAYPOINT UTILITY WEB  /  TOWER HORIZON 2.0",30,21);
+    doc.setFontSize(10);doc.text("WAYPOINT UTILITY WEB  /  TOWER HORIZON 2.1",30,21);
     doc.setFontSize(15.8);doc.text(clean(title),30,45);
     doc.setTextColor(65,84,99);doc.setFont("helvetica","normal");doc.setFontSize(8.5);
     doc.text(clean(subtitle),30,78);
@@ -217,6 +217,7 @@
   async function download() {
     const path=pathData();
     checkPath(path);
+    const rf=window.TowerRFUI.getPathSnapshot(path);
     if(!window.jspdf?.jsPDF) {
       if(typeof window.TowerHorizonExports?.ensurePdfLibrary==="function")
         await window.TowerHorizonExports.ensurePdfLibrary();
@@ -227,6 +228,7 @@
       .catch(error=>{console.warn("USGS source metadata unavailable",error);return null;});
     const map=await capturePathMap(path);
     if(path!==pathData())throw new Error("The path inputs changed during export. Analyze the new path.");
+    if(!window.TowerRFUI.isCurrent(rf))throw new Error("RF inputs changed during export. Export the new result.");
     const doc=new window.jspdf.jsPDF({orientation:"portrait",unit:"pt",format:"letter",compress:true});
     header(doc,"Two-way point-to-point terrain assessment",
       "Generated "+new Date().toLocaleString("en-US")+
@@ -283,25 +285,29 @@
     doc.text(fitLine(doc,"USGS source projects: "+
       (sources?.projectText || "Not reported by source")),30,752);
     doc.setFontSize(7.2);doc.setTextColor(96,108,116);
-    doc.text("Bare-earth geometry only; excludes Fresnel zone, foliage, buildings, interference and RF link budget.",30,765);
+    doc.text("Bare-earth geometry only; excludes Fresnel, foliage, buildings and interference. RF reference on page 2.",30,765);
     doc.text("30-degree sector is orientation only, not coverage. Geometric clearance is not duplex reliability.",30,776);
     doc.setDrawColor(188,199,208);doc.line(30,781,582,781);
-    doc.setFontSize(7.5);doc.text("USGS 3DEP  /  OpenStreetMap contributors  /  BETA  /  1 OF 1",30,788);
+    doc.setFontSize(7.5);doc.text("USGS 3DEP  /  OpenStreetMap contributors  /  BETA  /  1 OF 2",30,788);
     const id=String($("asrn")?.value||"").replace(/\D/g,"").slice(0,7)||"manual";
+    doc.addPage();
+    window.TowerRFReport.drawPage(doc,rf,2,2);
     doc.save("tower-horizon-"+id+"-"+new Date().toISOString().slice(0,10)+"-point-to-point.pdf");
-    status("One-page point-to-point report downloaded. It contains only the selected path and one 30-degree orientation sector.");
+    status("Two-page point-to-point report downloaded with the selected terrain path and both RF directions.");
   }
   async function run() {
     const button=$("exportPathPdf");
     if(button.disabled)return;
-    button.disabled=true;
+    busy=true;button.disabled=true;
     try{await download();}
     catch(error){console.error("Point-to-point report failed:",error);
       status("Point-to-point PDF failed: "+error.message,true);}
-    finally{update();}
+    finally{busy=false;update();}
   }
-  function update() { $("exportPathPdf").disabled=!pathData(); }
+  let busy=false;
+  function update() { $("exportPathPdf").disabled=busy || !pathData() || !window.TowerRFUI.canExportPath(); }
   $("exportPathPdf").addEventListener("click",run);
+  window.addEventListener("towerRFUpdated",update);
   window.addEventListener("towerPathUpdated",update);
   window.addEventListener("towerPathCleared",update);
   update();
